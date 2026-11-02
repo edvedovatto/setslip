@@ -5,6 +5,19 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import com.vedovatto.setslip.ui.theme.Fonts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -12,6 +25,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.core.content.FileProvider
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.withStyle
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,8 +81,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.vedovatto.setslip.data.Catalog
 import com.vedovatto.setslip.domain.Workout
+import com.vedovatto.setslip.ui.LocalStrings
 import com.vedovatto.setslip.ui.printer.PrinterTimings.DROP_MS
 import com.vedovatto.setslip.ui.printer.PrinterTimings.FEED_MS
 import com.vedovatto.setslip.ui.printer.PrinterTimings.IMPULSE_MS
@@ -57,14 +93,20 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private const val HANDOFF_MS = 100
+private const val UNDO_MS = 4000L
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun PrinterScreen(vm: PrinterViewModel = viewModel()) {
+fun PrinterScreen(vm: PrinterViewModel) {
     val state by vm.state.collectAsState()
     val motion = rememberMotionEnabled()
-    val haptics = rememberHaptics()
+    val strings = LocalStrings.current
+    val haptics = rememberHaptics(state.prefs.vibrationOn)
     var feeding by remember { mutableStateOf(false) }
+    val shareLayer = rememberGraphicsLayer()
+    var sharing by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val sounds = rememberPrinterSounds()
     LaunchedEffect(feeding, state.soundOn) {
         if (feeding && state.soundOn) sounds.playFeed() else sounds.stopFeed()
@@ -86,6 +128,7 @@ fun PrinterScreen(vm: PrinterViewModel = viewModel()) {
         PrinterHeader(
             printing = feeding,
             soundOn = state.soundOn,
+            strings = strings,
             onToggleSound = vm::onToggleSound,
             modifier = Modifier.zIndex(2f),
         )
@@ -93,6 +136,29 @@ fun PrinterScreen(vm: PrinterViewModel = viewModel()) {
             state = state,
             motion = motion,
             haptics = haptics,
+            interaction = SlipInteraction(
+                checked = state.checked,
+                struck = state.prefs.struck,
+                favorite = state.isFavorite,
+                haptics = haptics,
+                onCheck = vm::onToggleCheck,
+                onStrike = vm::onStrike,
+                onFavorite = vm::onToggleFavorite,
+                onHowTo = { if (!state.busy) vm.onNavigate(Screen.Index) },
+                onShare = {
+                    if (!state.busy && !sharing) scope.launch {
+                        sharing = true
+                        withFrameNanos { }
+                        withFrameNanos { }
+                        try { shareSlip(context, shareLayer, strings.share) } finally { sharing = false }
+                    }
+                },
+                sharing = sharing,
+            ),
+            shareLayer = shareLayer,
+            onTipSeen = vm::onTipSeen,
+            onUndo = vm::onUndoStrike,
+            onDismissUndo = vm::onDismissUndo,
             onFeeding = { feeding = it },
             onFinished = vm::onPrintFinished,
             modifier = Modifier
@@ -101,10 +167,13 @@ fun PrinterScreen(vm: PrinterViewModel = viewModel()) {
         )
         KeyPanel(
             state = state,
+            strings = strings,
             haptics = haptics,
             onKey = vm::onKey,
             onPrint = vm::onPrint,
             onReprint = vm::onReprint,
+            onSettings = { vm.onNavigate(Screen.Settings) },
+            onFavorites = { vm.onNavigate(Screen.Favorites) },
             modifier = Modifier.zIndex(3f),
         )
     }
@@ -115,10 +184,16 @@ private fun PaperTray(
     state: PrinterUiState,
     motion: Boolean,
     haptics: Haptics,
+    interaction: SlipInteraction,
+    shareLayer: GraphicsLayer,
+    onTipSeen: () -> Unit,
+    onUndo: () -> Unit,
+    onDismissUndo: () -> Unit,
     onFeeding: (Boolean) -> Unit,
     onFinished: () -> Unit,
     modifier: Modifier,
 ) {
+    val strings = LocalStrings.current
     BoxWithConstraints(
         modifier
             .fillMaxWidth()
@@ -131,18 +206,49 @@ private fun PaperTray(
         }
         state.current?.let { w ->
             key(w.serial) {
-                FeedingPaper(
-                    workout = w,
-                    animate = state.busy,
-                    delayMs = if (state.discarding != null) DROP_MS + HANDOFF_MS else 0,
-                    motion = motion,
-                    haptics = haptics,
-                    onFeeding = onFeeding,
-                    onFinished = onFinished,
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = 64.dp)
+                        .testTag("paper_scroll"),
+                ) {
+                    FeedingPaper(
+                        workout = w,
+                        animate = state.busy,
+                        delayMs = if (state.discarding != null) DROP_MS + HANDOFF_MS else 0,
+                        motion = motion,
+                        haptics = haptics,
+                        interaction = interaction,
+                        shareLayer = shareLayer,
+                        onFeeding = onFeeding,
+                        onFinished = onFinished,
+                    )
+                }
+            }
+        }
+        if (state.current == null) {
+            EmptyHint(strings.hintEmpty, Modifier.align(Alignment.TopCenter).padding(top = 26.dp, start = 30.dp, end = 30.dp))
+        }
+        Sink(Modifier.align(Alignment.BottomCenter))
+        if (state.current != null && state.phase == PrinterPhase.READY && !state.prefs.tipSeen) {
+            TipCard(strings, onTipSeen, Modifier.align(Alignment.BottomCenter).padding(bottom = 62.dp, start = 18.dp, end = 18.dp))
+        }
+        state.undoId?.let { id ->
+            val exercise = Catalog.byId[id]
+            if (exercise != null) {
+                LaunchedEffect(state.undoCount) {
+                    delay(UNDO_MS)
+                    onDismissUndo()
+                }
+                UndoToast(
+                    text = "${strings.crossedOut}: ${exercise.name(strings.language)}",
+                    action = strings.undo,
+                    onUndo = { haptics.key(); onUndo() },
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 22.dp, start = 24.dp, end = 24.dp),
                 )
             }
         }
-        Sink(Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -157,6 +263,8 @@ private fun FeedingPaper(
     delayMs: Int,
     motion: Boolean,
     haptics: Haptics,
+    interaction: SlipInteraction,
+    shareLayer: GraphicsLayer,
     onFeeding: (Boolean) -> Unit,
     onFinished: () -> Unit,
 ) {
@@ -217,12 +325,17 @@ private fun FeedingPaper(
     PaperSlip(
         workout = workout,
         glow = { glow.value },
+        interaction = interaction,
         modifier = PaperModifier
             .onSizeChanged { heightPx = it.height }
             .graphicsLayer {
                 alpha = if (visible) 1f else 0f
                 translationY = y.value
                 translationX = if (jitter) jitterPx else 0f
+            }
+            .drawWithContent {
+                shareLayer.record { this@drawWithContent.drawContent() }
+                drawLayer(shareLayer)
             }
             .testTag("paper_current"),
     )
@@ -270,7 +383,7 @@ private fun sway(p: Float): Float {
     return points[i] + (points[i + 1] - points[i]) * f
 }
 
-private fun Modifier.trayBackground() = drawWithCache {
+internal fun Modifier.trayBackground() = drawWithCache {
     val cx = size.width / 2f
     val cy = size.height * 0.34f
     val rx = size.width * 0.75f
@@ -329,4 +442,130 @@ private fun Sink(modifier: Modifier) {
                 )
             },
     )
+}
+
+@Composable
+private fun UndoToast(text: String, action: String, onUndo: () -> Unit, modifier: Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .softShadow(Color(0xAA000000), blur = 16.dp, corner = 8.dp, offsetY = { 6.dp })
+            .background(Palette.PrinterMid, RoundedCornerShape(8.dp))
+            .padding(start = 14.dp, end = 4.dp)
+            .testTag("toast_riscado"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BasicText(
+            text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = TextStyle(fontFamily = Fonts.Mono, fontSize = 11.sp, color = Palette.CapText),
+            modifier = Modifier.weight(1f),
+        )
+        BasicText(
+            action,
+            style = TextStyle(fontFamily = Fonts.Mono, fontWeight = FontWeight.Medium, fontSize = 11.sp, letterSpacing = 0.12.em, color = Palette.Warm),
+            modifier = Modifier
+                .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onUndo)
+                .testTag("btn_desfazer")
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+        )
+    }
+}
+
+@Composable
+private fun EmptyHint(text: String, modifier: Modifier) {
+    val amber = Palette.Warm
+    Column(
+        modifier
+            .fillMaxWidth()
+            .drawBehind {
+                drawRoundRect(
+                    amber.copy(alpha = 0.55f),
+                    cornerRadius = CornerRadius(4.dp.toPx()),
+                    style = Stroke(1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx()))),
+                )
+            }
+            .padding(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 20.dp)
+            .testTag("hint_vazio"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        BasicText(
+            text,
+            style = TextStyle(
+                fontFamily = Fonts.Mono, fontSize = 12.sp, letterSpacing = 0.16.em, lineHeight = 20.sp,
+                color = Color(0xFFCFC7B6), textAlign = TextAlign.Center,
+            ),
+        )
+        Spacer(Modifier.height(12.dp))
+        Box(Modifier.size(22.dp).drawBehind { arrowDownIcon(amber) })
+    }
+}
+
+@Composable
+private fun TipCard(strings: com.vedovatto.setslip.ui.Strings, onDismiss: () -> Unit, modifier: Modifier) {
+    val amber = Palette.Warm
+    val icons: List<androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit> = listOf(
+        { checkIcon(amber, 2.dp.toPx()) },
+        { handIcon(amber) },
+        { starIcon(amber, filled = false) },
+        { helpIcon(amber) },
+    )
+    Column(
+        modifier
+            .fillMaxWidth()
+            .softShadow(Color(0xA6000000), blur = 22.dp, corner = 8.dp, offsetY = { 10.dp })
+            .background(Color(0xFF1C1A17), RoundedCornerShape(8.dp))
+            .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 12.dp)
+            .testTag("toast_dica"),
+    ) {
+        BasicText(
+            strings.tipTitle,
+            style = TextStyle(fontFamily = Fonts.Mono, fontWeight = FontWeight.Medium, fontSize = 10.sp, letterSpacing = 0.24.em, color = amber),
+            modifier = Modifier.padding(bottom = 9.dp),
+        )
+        strings.tips.forEachIndexed { i, (key, rest) ->
+            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(18.dp).drawBehind(icons[i]))
+                Spacer(Modifier.width(10.dp))
+                BasicText(
+                    androidx.compose.ui.text.buildAnnotatedString {
+                        withStyle(androidx.compose.ui.text.SpanStyle(color = Color.White, fontWeight = FontWeight.Medium)) { append(key) }
+                        append(rest)
+                    },
+                    style = TextStyle(fontFamily = Fonts.Mono, fontSize = 11.sp, letterSpacing = 0.06.em, lineHeight = 15.sp, color = Color(0xFFEFE8D8)),
+                )
+            }
+        }
+        Box(
+            Modifier
+                .padding(top = 9.dp)
+                .fillMaxWidth()
+                .height(36.dp)
+                .background(amber, RoundedCornerShape(5.dp))
+                .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onDismiss)
+                .testTag("btn_entendi"),
+            contentAlignment = Alignment.Center,
+        ) {
+            BasicText(
+                strings.gotIt,
+                style = TextStyle(fontFamily = Fonts.Mono, fontWeight = FontWeight.Medium, fontSize = 10.5.sp, letterSpacing = 0.2.em, color = Palette.AmberText),
+            )
+        }
+    }
+}
+
+private suspend fun shareSlip(context: Context, layer: GraphicsLayer, title: String) {
+    val bitmap = layer.toImageBitmap().asAndroidBitmap()
+    val file = withContext(Dispatchers.IO) {
+        val dir = File(context.cacheDir, "shared").apply { mkdirs() }
+        File(dir, "setslip.png").also { f -> f.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+    }
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(send, title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }

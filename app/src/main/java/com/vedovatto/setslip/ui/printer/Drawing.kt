@@ -7,7 +7,9 @@ import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import android.view.View
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
@@ -91,17 +93,23 @@ fun rememberMotionEnabled(): Boolean {
     }
 }
 
-class Haptics(private val view: View) {
-    fun feedStep() = view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-    fun key() = view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-    fun reject() = view.performHapticFeedback(
+class Haptics(private val view: View, private val enabled: () -> Boolean) {
+    fun feedStep() = fire(HapticFeedbackConstants.CLOCK_TICK)
+    fun key() = fire(HapticFeedbackConstants.KEYBOARD_TAP)
+    fun hold() = fire(HapticFeedbackConstants.LONG_PRESS)
+    fun reject() = fire(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) HapticFeedbackConstants.REJECT
         else HapticFeedbackConstants.LONG_PRESS,
     )
+
+    private fun fire(constant: Int) {
+        if (enabled()) view.performHapticFeedback(constant)
+    }
 }
 
 @Composable
-fun rememberHaptics(): Haptics {
+fun rememberHaptics(enabled: Boolean): Haptics {
     val view = LocalView.current
-    return remember(view) { Haptics(view) }
+    val current by rememberUpdatedState(enabled)
+    return remember(view) { Haptics(view) { current } }
 }

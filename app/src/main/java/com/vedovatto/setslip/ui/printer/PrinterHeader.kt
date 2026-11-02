@@ -17,7 +17,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.semantics.contentDescription
+import com.vedovatto.setslip.ui.Strings
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import com.vedovatto.setslip.ui.theme.Fonts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,8 +57,10 @@ import kotlinx.coroutines.delay
 fun PrinterHeader(
     printing: Boolean,
     soundOn: Boolean,
+    strings: Strings,
     onToggleSound: () -> Unit,
     modifier: Modifier = Modifier,
+    title: String? = null,
 ) {
     val top = WindowInsets.safeDrawing.only(WindowInsetsSides.Top).asPaddingValues().calculateTopPadding()
 
@@ -73,6 +85,15 @@ fun PrinterHeader(
                 .padding(top = top, bottom = 11.dp),
             contentAlignment = Alignment.Center,
         ) {
+            if (title != null) {
+                BasicText(
+                    title,
+                    style = TextStyle(
+                        fontFamily = Fonts.Mono, fontWeight = FontWeight.Medium, fontSize = 12.sp,
+                        letterSpacing = 0.2.em, color = Palette.CapText,
+                    ),
+                )
+            }
             Led(
                 printing = printing,
                 soundOn = soundOn,
@@ -83,10 +104,10 @@ fun PrinterHeader(
                         interactionSource = null,
                         indication = null,
                         role = Role.Switch,
-                        onClickLabel = if (soundOn) "silenciar" else "ligar som",
+                        onClickLabel = if (soundOn) strings.mute else strings.unmute,
                         onClick = onToggleSound,
                     )
-                    .padding(horizontal = 18.dp, vertical = 7.dp),
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
             )
         }
         Slot(

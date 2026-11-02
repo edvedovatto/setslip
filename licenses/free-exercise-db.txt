@@ -1,0 +1,4 @@
+Exercise photos and metadata (muscles, equipment, level) come from free-exercise-db
+https://github.com/yuhonas/free-exercise-db
+Released under The Unlicense (public domain). Photos were resized; instructions in
+the app are original text.

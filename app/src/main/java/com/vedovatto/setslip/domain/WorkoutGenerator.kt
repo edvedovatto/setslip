@@ -4,12 +4,18 @@ const val VARIATIONS = 3
 
 class WorkoutGenerator(private val catalog: Map<MuscleGroup, List<Exercise>>) {
 
-    fun generate(serial: Int, groups: List<MuscleGroup>, variations: Map<MuscleGroup, Int>): Workout {
+    fun generate(
+        serial: Int,
+        groups: List<MuscleGroup>,
+        variations: Map<MuscleGroup, Int>,
+        struck: Set<String> = emptySet(),
+    ): Workout {
         require(groups.isNotEmpty() && groups.size <= MAX_GROUPS) { "1 a $MAX_GROUPS grupos" }
         val ordered = groups.sortedWith(compareBy({ it.size.ordinal }, { it.ordinal }))
         val used = mutableSetOf<String>()
         val sections = ordered.map { group ->
-            val pool = catalog.getValue(group).rotated(variationOf(group, variations) * 2)
+            val (kept, dropped) = catalog.getValue(group).partition { it.id !in struck }
+            val pool = (kept + dropped).rotated(variationOf(group, variations) * 2)
             val picked = pool.filter { used.add(it.name) }.take(countFor(group, ordered))
             WorkoutSection(group, picked)
         }

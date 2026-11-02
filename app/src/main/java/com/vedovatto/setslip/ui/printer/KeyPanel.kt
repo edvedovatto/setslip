@@ -19,6 +19,9 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -52,7 +55,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import com.vedovatto.setslip.domain.MAX_GROUPS
 import com.vedovatto.setslip.domain.MuscleGroup
+import com.vedovatto.setslip.ui.Strings
 import com.vedovatto.setslip.ui.printer.PrinterTimings.KEY_PRESS_MS
 import com.vedovatto.setslip.ui.printer.PrinterTimings.REJECT_SHAKE_MS
 import com.vedovatto.setslip.ui.printer.PrinterTimings.rejectShake
@@ -62,53 +67,118 @@ import com.vedovatto.setslip.ui.theme.Palette
 @Composable
 fun KeyPanel(
     state: PrinterUiState,
+    strings: Strings,
     haptics: Haptics,
     onKey: (MuscleGroup) -> Unit,
     onPrint: () -> Unit,
     onReprint: () -> Unit,
+    onSettings: () -> Unit,
+    onFavorites: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val bottom = WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom).asPaddingValues().calculateBottomPadding()
 
     Column(
         modifier
-            .fillMaxWidth()
-            .softShadow(Color(0xAA000000), blur = 24.dp, offsetY = { (-10).dp })
-            .background(Brush.verticalGradient(listOf(Palette.PanelTop, Palette.PanelBottom)))
-            .drawBehind {
-                drawRect(Color(0x14FFFFFF), size = Size(size.width, 1.dp.toPx()))
-                screw(Offset(9.dp.toPx() + 3.5.dp.toPx(), 8.dp.toPx() + 3.5.dp.toPx()))
-                screw(Offset(size.width - 9.dp.toPx() - 3.5.dp.toPx(), 8.dp.toPx() + 3.5.dp.toPx()))
-            }
-            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 36.dp + bottom),
+            .panelSurface()
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 26.dp + bottom),
     ) {
-        MuscleGroup.entries.chunked(5).forEachIndexed { i, row ->
-            if (i > 0) Spacer(Modifier.height(12.dp))
+        MuscleGroup.entries.chunked(3).forEachIndexed { i, row ->
+            if (i > 0) Spacer(Modifier.height(9.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { group ->
-                    SelectKey(
-                        group = group,
+                    GroupKey(
+                        label = strings.code(group),
+                        description = strings.group(group),
                         selected = group in state.selection,
                         shakeCount = if (state.rejected == group) state.rejectCount else 0,
                         flashCount = state.rejectCount,
                         haptics = haptics,
                         onClick = { onKey(group) },
-                        modifier = Modifier.weight(1f),
+                        height = 42.dp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("key_${group.code.lowercase()}"),
                     )
                 }
             }
         }
-        Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconKey(
+                description = strings.settings, tag = "btn_ajustes", enabled = true,
+                haptics = haptics, onClick = onSettings,
+            ) { gearIcon(Palette.CapText) }
+            IconKey(
+                description = strings.favorites, tag = "btn_favoritas", enabled = true,
+                haptics = haptics, onClick = onFavorites, badge = state.prefs.favorites.size,
+            ) { starIcon(Palette.CapText, filled = false) }
+            IconKey(
+                description = strings.another, tag = "btn_outra", enabled = state.canReprint,
+                haptics = haptics, onClick = onReprint,
+            ) { refreshIcon(Palette.CapText) }
             PanelButton(
-                label = "IMPRIMIR", glyph = "►", amber = true, enabled = state.canPrint,
+                label = strings.print, glyph = "►", amber = true, enabled = state.canPrint,
                 onClick = { haptics.key(); onPrint() },
-                modifier = Modifier.weight(1.5f).testTag("btn_imprimir"),
+                height = 46.dp,
+                modifier = Modifier.weight(1f).testTag("btn_imprimir"),
             )
-            PanelButton(
-                label = "OUTRA", glyph = "↻", amber = false, enabled = state.canReprint,
-                onClick = { haptics.key(); onReprint() },
-                modifier = Modifier.weight(1f).testTag("btn_outra"),
+        }
+    }
+}
+
+@Composable
+private fun IconKey(
+    description: String,
+    tag: String,
+    enabled: Boolean,
+    haptics: Haptics,
+    onClick: () -> Unit,
+    badge: Int = 0,
+    draw: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val depth by animateFloatAsState(if (pressed) 1f else 0f, tween(KEY_PRESS_MS), label = "depth")
+    Box(Modifier.width(46.dp)) {
+        KeyCap(
+            depth = { depth },
+            height = 46.dp,
+            corner = 11.dp,
+            travel = 4.dp,
+            side = 5.dp,
+            top = Palette.CapTop,
+            bottom = Palette.CapBottom,
+            sideColor = Palette.CapSide,
+            highlight = Color(0x33FFFFFF),
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    alpha = if (enabled) 1f else 0.5f
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                }
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    enabled = enabled,
+                    role = Role.Button,
+                    onClick = { haptics.key(); onClick() },
+                )
+                .semantics { contentDescription = description }
+                .testTag(tag),
+        ) {
+            Box(Modifier.size(20.dp).drawBehind(draw))
+        }
+        if (badge > 0) {
+            BasicText(
+                badge.toString(),
+                style = TextStyle(fontFamily = Fonts.Mono, fontWeight = FontWeight.Medium, fontSize = 9.sp, color = Palette.AmberText),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 4.dp, y = (-5).dp)
+                    .background(Palette.Warm, RoundedCornerShape(7.dp))
+                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                    .testTag("badge_favoritas"),
             )
         }
     }
@@ -128,14 +198,16 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.screw(center: Offse
 }
 
 @Composable
-private fun SelectKey(
-    group: MuscleGroup,
+internal fun GroupKey(
+    label: String,
     selected: Boolean,
     shakeCount: Int,
     flashCount: Int,
     haptics: Haptics,
     onClick: () -> Unit,
     modifier: Modifier,
+    height: Dp = 36.dp,
+    description: String = label,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -164,7 +236,7 @@ private fun SelectKey(
 
     KeyCap(
         depth = { depth },
-        height = 44.dp,
+        height = height,
         corner = 9.dp,
         travel = 3.dp,
         side = 4.dp,
@@ -181,14 +253,15 @@ private fun SelectKey(
                 role = Role.Checkbox,
                 onValueChange = { haptics.key(); onClick() },
             )
-            .semantics { contentDescription = group.label }
-            .testTag("key_${group.code.lowercase()}"),
+            .semantics { contentDescription = description },
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Box(
                 Modifier
-                    .width(18.dp)
-                    .height(3.dp)
+                    .align(Alignment.CenterStart)
+                    .padding(start = 9.dp)
+                    .width(3.dp)
+                    .height(16.dp)
                     .softShadow(
                         Palette.Warm, blur = 8.dp, corner = 1.5.dp,
                         alpha = { if (selected) flash.value else 0f },
@@ -201,14 +274,14 @@ private fun SelectKey(
                         )
                     },
             )
-            Spacer(Modifier.height(6.dp))
             BasicText(
-                group.code,
+                label.uppercase(),
+                maxLines = 1,
                 style = TextStyle(
                     fontFamily = Fonts.Mono,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 10.sp,
-                    letterSpacing = 0.08.em,
+                    fontSize = 11.sp,
+                    letterSpacing = 0.06.em,
                     color = if (selected) Color.White else Palette.CapText,
                     shadow = Shadow(Color.Black, Offset(0f, 3f), 0f),
                 ),
@@ -218,13 +291,14 @@ private fun SelectKey(
 }
 
 @Composable
-private fun PanelButton(
+internal fun PanelButton(
     label: String,
     glyph: String,
     amber: Boolean,
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier,
+    height: Dp = 58.dp,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -239,7 +313,7 @@ private fun PanelButton(
 
     KeyCap(
         depth = { depth },
-        height = 58.dp,
+        height = height,
         corner = 13.dp,
         travel = 5.dp,
         side = 6.dp,
@@ -277,7 +351,7 @@ private fun PanelButton(
 }
 
 @Composable
-private fun KeyCap(
+internal fun KeyCap(
     depth: () -> Float,
     height: Dp,
     corner: Dp,
@@ -322,3 +396,13 @@ private fun KeyCap(
         content()
     }
 }
+
+internal fun Modifier.panelSurface(): Modifier = this
+    .fillMaxWidth()
+    .softShadow(Color(0xAA000000), blur = 24.dp, offsetY = { (-10).dp })
+    .background(Brush.verticalGradient(listOf(Palette.PanelTop, Palette.PanelBottom)))
+    .drawBehind {
+        drawRect(Color(0x14FFFFFF), size = Size(size.width, 1.dp.toPx()))
+        screw(Offset(9.dp.toPx() + 3.5.dp.toPx(), 8.dp.toPx() + 3.5.dp.toPx()))
+        screw(Offset(size.width - 9.dp.toPx() - 3.5.dp.toPx(), 8.dp.toPx() + 3.5.dp.toPx()))
+    }
