@@ -1,68 +1,48 @@
 package com.vedovatto.setslip.ui.printer
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.em
-import androidx.compose.ui.unit.sp
-import com.vedovatto.setslip.ui.theme.Fonts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import android.content.Context
-import android.content.Intent
-import android.graphics.Bitmap
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.graphics.layer.GraphicsLayer
-import androidx.compose.ui.graphics.layer.drawLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
-import androidx.core.content.FileProvider
-import java.io.File
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.text.withStyle
-import androidx.compose.runtime.withFrameNanos
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
@@ -70,32 +50,60 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.AccessibilityManager
+import androidx.compose.ui.platform.LocalAccessibilityManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.core.content.FileProvider
 import com.vedovatto.setslip.data.Catalog
 import com.vedovatto.setslip.domain.Workout
 import com.vedovatto.setslip.ui.LocalStrings
+import com.vedovatto.setslip.ui.Strings
 import com.vedovatto.setslip.ui.printer.PrinterTimings.DROP_MS
 import com.vedovatto.setslip.ui.printer.PrinterTimings.FEED_MS
 import com.vedovatto.setslip.ui.printer.PrinterTimings.IMPULSE_MS
+import com.vedovatto.setslip.ui.theme.Fonts
 import com.vedovatto.setslip.ui.theme.Palette
+import java.io.File
+import java.io.IOException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val HANDOFF_MS = 100
 private const val UNDO_MS = 4000L
+private const val BLOCKED_MS = 6000L
 
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun PrinterScreen(vm: PrinterViewModel) {
     val state by vm.state.collectAsState()
@@ -119,10 +127,6 @@ fun PrinterScreen(vm: PrinterViewModel) {
         Modifier
             .fillMaxSize()
             .background(Palette.Graphite)
-            .semantics {
-                testTagsAsResourceId = true
-                stateDescription = state.phase.description
-            }
             .testTag("printer"),
     ) {
         PrinterHeader(
@@ -150,7 +154,15 @@ fun PrinterScreen(vm: PrinterViewModel) {
                         sharing = true
                         withFrameNanos { }
                         withFrameNanos { }
-                        try { shareSlip(context, shareLayer, strings.share) } finally { sharing = false }
+                        try {
+                            shareSlip(context, shareLayer, strings.share)
+                        } catch (_: IOException) {
+                            haptics.reject()
+                        } catch (_: ActivityNotFoundException) {
+                            haptics.reject()
+                        } finally {
+                            sharing = false
+                        }
                     }
                 },
                 sharing = sharing,
@@ -159,6 +171,8 @@ fun PrinterScreen(vm: PrinterViewModel) {
             onTipSeen = vm::onTipSeen,
             onUndo = vm::onUndoStrike,
             onDismissUndo = vm::onDismissUndo,
+            onReactivate = vm::onReactivateBlocked,
+            onDismissBlocked = vm::onDismissBlocked,
             onFeeding = { feeding = it },
             onFinished = vm::onPrintFinished,
             modifier = Modifier
@@ -189,11 +203,15 @@ private fun PaperTray(
     onTipSeen: () -> Unit,
     onUndo: () -> Unit,
     onDismissUndo: () -> Unit,
+    onReactivate: () -> Unit,
+    onDismissBlocked: () -> Unit,
     onFeeding: (Boolean) -> Unit,
     onFinished: () -> Unit,
     modifier: Modifier,
 ) {
     val strings = LocalStrings.current
+    val accessibility = LocalAccessibilityManager.current
+    val status = if (state.rejected != null) strings.maxGroups else strings.phase(state.phase)
     BoxWithConstraints(
         modifier
             .fillMaxWidth()
@@ -238,19 +256,49 @@ private fun PaperTray(
             val exercise = Catalog.byId[id]
             if (exercise != null) {
                 LaunchedEffect(state.undoCount) {
-                    delay(UNDO_MS)
+                    delay(accessibility.timeoutFor(UNDO_MS))
                     onDismissUndo()
                 }
-                UndoToast(
+                Toast(
                     text = "${strings.crossedOut}: ${exercise.name(strings.language)}",
                     action = strings.undo,
-                    onUndo = { haptics.key(); onUndo() },
+                    tag = "toast_struck",
+                    actionTag = "btn_undo",
+                    onAction = { haptics.key(); onUndo() },
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 22.dp, start = 24.dp, end = 24.dp),
                 )
             }
         }
+        if (state.blocked.isNotEmpty()) {
+            LaunchedEffect(state.blockedCount) {
+                haptics.reject()
+                delay(accessibility.timeoutFor(BLOCKED_MS))
+                onDismissBlocked()
+            }
+            Toast(
+                text = strings.noExercises(state.blocked),
+                action = strings.reactivate,
+                tag = "toast_blocked",
+                actionTag = "btn_reactivate",
+                onAction = { haptics.key(); onReactivate() },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 22.dp, start = 24.dp, end = 24.dp),
+            )
+        }
+        Box(
+            Modifier
+                .align(Alignment.CenterStart)
+                .size(1.dp)
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    contentDescription = status
+                }
+                .testTag("status"),
+        )
     }
 }
+
+private fun AccessibilityManager?.timeoutFor(millis: Long) =
+    this?.calculateRecommendedTimeoutMillis(millis, containsText = true, containsControls = true) ?: millis
 
 private val PaperModifier = Modifier
     .padding(horizontal = 30.dp)
@@ -445,19 +493,20 @@ private fun Sink(modifier: Modifier) {
 }
 
 @Composable
-private fun UndoToast(text: String, action: String, onUndo: () -> Unit, modifier: Modifier) {
+private fun Toast(text: String, action: String, tag: String, actionTag: String, onAction: () -> Unit, modifier: Modifier) {
     Row(
         modifier
             .fillMaxWidth()
             .softShadow(Color(0xAA000000), blur = 16.dp, corner = 8.dp, offsetY = { 6.dp })
             .background(Palette.PrinterMid, RoundedCornerShape(8.dp))
             .padding(start = 14.dp, end = 4.dp)
-            .testTag("toast_riscado"),
+            .semantics { liveRegion = LiveRegionMode.Polite }
+            .testTag(tag),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BasicText(
             text,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             style = TextStyle(fontFamily = Fonts.Mono, fontSize = 11.sp, color = Palette.CapText),
             modifier = Modifier.weight(1f),
@@ -466,8 +515,8 @@ private fun UndoToast(text: String, action: String, onUndo: () -> Unit, modifier
             action,
             style = TextStyle(fontFamily = Fonts.Mono, fontWeight = FontWeight.Medium, fontSize = 11.sp, letterSpacing = 0.12.em, color = Palette.Warm),
             modifier = Modifier
-                .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onUndo)
-                .testTag("btn_desfazer")
+                .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onAction)
+                .testTag(actionTag)
                 .padding(horizontal = 14.dp, vertical = 14.dp),
         )
     }
@@ -487,7 +536,7 @@ private fun EmptyHint(text: String, modifier: Modifier) {
                 )
             }
             .padding(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 20.dp)
-            .testTag("hint_vazio"),
+            .testTag("hint_empty"),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         BasicText(
@@ -503,9 +552,9 @@ private fun EmptyHint(text: String, modifier: Modifier) {
 }
 
 @Composable
-private fun TipCard(strings: com.vedovatto.setslip.ui.Strings, onDismiss: () -> Unit, modifier: Modifier) {
+private fun TipCard(strings: Strings, onDismiss: () -> Unit, modifier: Modifier) {
     val amber = Palette.Warm
-    val icons: List<androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit> = listOf(
+    val icons: List<DrawScope.() -> Unit> = listOf(
         { checkIcon(amber, 2.dp.toPx()) },
         { handIcon(amber) },
         { starIcon(amber, filled = false) },
@@ -517,7 +566,7 @@ private fun TipCard(strings: com.vedovatto.setslip.ui.Strings, onDismiss: () -> 
             .softShadow(Color(0xA6000000), blur = 22.dp, corner = 8.dp, offsetY = { 10.dp })
             .background(Color(0xFF1C1A17), RoundedCornerShape(8.dp))
             .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 12.dp)
-            .testTag("toast_dica"),
+            .testTag("toast_tip"),
     ) {
         BasicText(
             strings.tipTitle,
@@ -529,8 +578,8 @@ private fun TipCard(strings: com.vedovatto.setslip.ui.Strings, onDismiss: () -> 
                 Box(Modifier.size(18.dp).drawBehind(icons[i]))
                 Spacer(Modifier.width(10.dp))
                 BasicText(
-                    androidx.compose.ui.text.buildAnnotatedString {
-                        withStyle(androidx.compose.ui.text.SpanStyle(color = Color.White, fontWeight = FontWeight.Medium)) { append(key) }
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.Medium)) { append(key) }
                         append(rest)
                     },
                     style = TextStyle(fontFamily = Fonts.Mono, fontSize = 11.sp, letterSpacing = 0.06.em, lineHeight = 15.sp, color = Color(0xFFEFE8D8)),
@@ -544,7 +593,7 @@ private fun TipCard(strings: com.vedovatto.setslip.ui.Strings, onDismiss: () -> 
                 .height(36.dp)
                 .background(amber, RoundedCornerShape(5.dp))
                 .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onDismiss)
-                .testTag("btn_entendi"),
+                .testTag("btn_got_it"),
             contentAlignment = Alignment.Center,
         ) {
             BasicText(

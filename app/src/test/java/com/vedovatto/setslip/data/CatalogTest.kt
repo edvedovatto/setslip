@@ -1,7 +1,7 @@
 package com.vedovatto.setslip.data
 
 import com.vedovatto.setslip.domain.MuscleGroup
-import java.io.File
+import com.vedovatto.setslip.ui.screens.exerciseImageIds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -10,15 +10,15 @@ class CatalogTest {
 
     private val all = Catalog.exercises.values.flatten()
 
-    @Test fun `todos os grupos tem catalogo`() =
+    @Test fun `every group has a catalog`() =
         assertEquals(MuscleGroup.entries.toSet(), Catalog.exercises.keys)
 
-    @Test fun `cada grupo tem 8 exercicios`() =
+    @Test fun `every group has eight exercises`() =
         Catalog.exercises.forEach { (group, list) -> assertEquals(group.name, 8, list.size) }
 
-    @Test fun `ids sao unicos`() = assertEquals(all.size, all.map { it.id }.toSet().size)
+    @Test fun `ids are unique`() = assertEquals(all.size, all.map { it.id }.toSet().size)
 
-    @Test fun `campos obrigatorios preenchidos`() = all.forEach {
+    @Test fun `required fields are filled in`() = all.forEach {
         assertTrue(it.id, it.id.matches(Regex("[a-z0-9]+(-[a-z0-9]+)*")))
         assertTrue(it.id, it.name.isNotBlank() && it.nameEn.isNotBlank())
         assertTrue(it.id, it.prescription.matches(Regex("[0-9]+ x [0-9]+s?")))
@@ -26,8 +26,5 @@ class CatalogTest {
         assertTrue(it.id, it.steps.size >= 3 && it.steps.all { s -> s.isNotBlank() })
     }
 
-    @Test fun `cada exercicio tem imagem`() {
-        val dir = File("src/main/res/drawable-nodpi")
-        all.forEach { assertTrue(it.imageName, File(dir, it.imageName + ".jpg").isFile) }
-    }
+    @Test fun `every exercise has a picture`() = assertEquals(Catalog.byId.keys, exerciseImageIds)
 }

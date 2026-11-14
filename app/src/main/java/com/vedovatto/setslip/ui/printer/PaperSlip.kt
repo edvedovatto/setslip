@@ -11,37 +11,41 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ShaderBrush
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -79,7 +83,6 @@ fun PaperSlip(
     interaction: SlipInteraction? = null,
     preview: Boolean = false,
 ) {
-    val grain = rememberPaperGrain()
     val strings = LocalStrings.current
     val multi = workout.sections.size > 1
     val rowSize = 13.sp
@@ -90,17 +93,20 @@ fun PaperSlip(
 
     Column(
         modifier
-            .paperBackground(grain, glow)
+            .paperBackground(glow)
             .padding(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 18.dp),
     ) {
+        val title = strings.title(workout)
+        val longTitle = title.length > 20
         BasicText(
-            strings.title(workout),
+            title,
+            maxLines = 1,
+            autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = if (longTitle) 12.sp else 15.sp, stepSize = 0.5.sp),
             style = Mono.copy(
-                fontSize = if (strings.title(workout).length > 20) 12.sp else 15.sp,
                 fontWeight = FontWeight.Medium,
-                letterSpacing = if (strings.title(workout).length > 20) 0.06.em else 0.12.em,
+                letterSpacing = if (longTitle) 0.06.em else 0.12.em,
             ),
-            modifier = Modifier.padding(bottom = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp).semantics { heading() },
         )
         Row(
             Modifier
@@ -117,24 +123,24 @@ fun PaperSlip(
                     } else append(strings.exercises(workout.exerciseCount))
                 },
                 maxLines = 1,
-                softWrap = false,
-                style = Mono.copy(fontSize = 10.sp, color = Palette.PaperMuted, letterSpacing = 0.04.em),
+                autoSize = TextAutoSize.StepBased(minFontSize = 6.sp, maxFontSize = 10.sp, stepSize = 0.5.sp),
+                style = Mono.copy(color = Palette.PaperMuted, letterSpacing = 0.04.em),
                 modifier = Modifier
                     .weight(1f)
                     .testTag("slip_counter"),
             )
             if (interaction != null && !interaction.sharing) {
                 Row(Modifier.offset(x = 8.dp)) {
-                    SlipAction(strings.howTo, "btn_como_fazer", Role.Button, interaction.haptics, interaction.onHowTo) {
+                    SlipAction(strings.howTo, "btn_how_to", interaction.haptics, interaction.onHowTo) {
                         Box(Modifier.size(21.dp).drawBehind { helpIcon(Palette.PaperText) })
                     }
                     SlipAction(
-                        if (interaction.favorite) strings.removeFavorite else strings.addFavorite,
-                        "btn_favoritar", Role.Switch, interaction.haptics, interaction.onFavorite,
+                        strings.favoriteSlip, "btn_favorite", interaction.haptics, interaction.onFavorite,
+                        toggled = interaction.favorite,
                     ) {
                         Box(Modifier.size(21.dp).drawBehind { starIcon(if (interaction.favorite) FavoriteRed else Palette.PaperText, interaction.favorite) })
                     }
-                    SlipAction(strings.share, "btn_compartilhar", Role.Button, interaction.haptics, interaction.onShare) {
+                    SlipAction(strings.share, "btn_share", interaction.haptics, interaction.onShare) {
                         Box(Modifier.size(21.dp).drawBehind { shareIcon(Palette.PaperText) })
                     }
                 }
@@ -156,10 +162,20 @@ fun PaperSlip(
                                     .combinedClickable(
                                         interactionSource = null,
                                         indication = null,
+                                        enabled = !isStruck,
+                                        onClickLabel = strings.check,
+                                        onLongClickLabel = strings.crossOut,
                                         onClick = { interaction.haptics.key(); interaction.onCheck(e.id) },
                                         onLongClick = { interaction.haptics.hold(); interaction.onStrike(e.id) },
                                     )
-                                    .semantics { contentDescription = e.name(strings.language) }
+                                    .semantics {
+                                        if (isStruck) {
+                                            stateDescription = strings.crossedOut
+                                        } else {
+                                            role = Role.Checkbox
+                                            toggleableState = if (isChecked) ToggleableState.On else ToggleableState.Off
+                                        }
+                                    }
                                     .testTag("row_${e.id}")
                             } else Modifier,
                         )
@@ -207,20 +223,33 @@ fun PaperSlip(
 private fun SlipAction(
     description: String,
     tag: String,
-    role: Role,
     haptics: Haptics,
     onClick: () -> Unit,
+    toggled: Boolean? = null,
     content: @Composable () -> Unit,
 ) {
+    val press = { haptics.key(); onClick() }
     Box(
         Modifier
             .size(36.dp)
-            .clickable(
-                interactionSource = null,
-                indication = null,
-                role = role,
-                onClickLabel = description,
-                onClick = { haptics.key(); onClick() },
+            .then(
+                if (toggled != null) {
+                    Modifier.toggleable(
+                        value = toggled,
+                        interactionSource = null,
+                        indication = null,
+                        role = Role.Switch,
+                        onValueChange = { press() },
+                    )
+                } else {
+                    Modifier.clickable(
+                        interactionSource = null,
+                        indication = null,
+                        role = Role.Button,
+                        onClickLabel = description,
+                        onClick = press,
+                    )
+                },
             )
             .semantics { contentDescription = description }
             .testTag(tag),
@@ -236,7 +265,7 @@ private fun CheckBox(checked: Boolean, struck: Boolean) {
             .drawBehind {
                 if (!struck) {
                     drawRoundRect(
-                        Color(0x66000000),
+                        Color(0x80000000),
                         cornerRadius = CornerRadius(2.dp.toPx()),
                         style = Stroke(1.dp.toPx()),
                     )
@@ -266,6 +295,7 @@ private fun SectionLabel(text: String, top: Dp) {
         BasicText(
             text,
             style = Mono.copy(fontSize = 9.5.sp, color = Palette.PaperMuted, letterSpacing = 0.2.em),
+            modifier = Modifier.semantics { heading() },
         )
         Spacer(Modifier.width(8.dp))
         Box(
@@ -293,7 +323,7 @@ private fun Barcode(seed: Int, modifier: Modifier) {
     )
 }
 
-fun Modifier.paperBackground(grain: ShaderBrush, glow: () -> Float = { 0f }): Modifier = this
+fun Modifier.paperBackground(glow: () -> Float = { 0f }): Modifier = this
     .softShadow(Color(0xAA000000), blur = 28.dp, offsetY = { 16.dp })
     .drawWithCache {
         val bg = Brush.verticalGradient(listOf(Palette.Paper, Palette.Paper2))
@@ -311,7 +341,7 @@ fun Modifier.paperBackground(grain: ShaderBrush, glow: () -> Float = { 0f }): Mo
                 x += scallopStep
             }
             drawRect(bg)
-            drawRect(grain)
+            drawRect(PaperGrain)
             scanlines(Color(0x07000000))
             drawContent()
             val g = glow()

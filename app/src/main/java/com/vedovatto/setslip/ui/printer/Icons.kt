@@ -32,24 +32,6 @@ fun DrawScope.gearIcon(color: Color) {
     }
 }
 
-fun DrawScope.pileIcon(color: Color) {
-    val u = min(size.width, size.height)
-    val w = u * 0.62f
-    val h = u * 0.4f
-    val stroke = Stroke(width = u * 0.09f, join = StrokeJoin.Round)
-    for (i in 0..2) {
-        val dy = (2 - i) * u * 0.2f
-        drawRoundRect(
-            color,
-            topLeft = Offset((size.width - w) / 2f, size.height * 0.5f - h / 2f - u * 0.2f + dy - (2 - i) * 0f),
-            size = Size(w, h),
-            cornerRadius = CornerRadius(u * 0.06f),
-            style = stroke,
-            alpha = 0.5f + 0.25f * i,
-        )
-    }
-}
-
 fun DrawScope.starIcon(color: Color, filled: Boolean) {
     val u = min(size.width, size.height)
     val c = center

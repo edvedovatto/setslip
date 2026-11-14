@@ -10,17 +10,21 @@ class WorkoutGenerator(private val catalog: Map<MuscleGroup, List<Exercise>>) {
         variations: Map<MuscleGroup, Int>,
         struck: Set<String> = emptySet(),
     ): Workout {
-        require(groups.isNotEmpty() && groups.size <= MAX_GROUPS) { "1 a $MAX_GROUPS grupos" }
+        require(groups.isNotEmpty() && groups.size <= MAX_GROUPS) { "expected 1 to $MAX_GROUPS groups" }
         val ordered = groups.sortedWith(compareBy({ it.size.ordinal }, { it.ordinal }))
-        val used = mutableSetOf<String>()
+        require(exhausted(ordered, struck).isEmpty()) { "every selected group needs an available exercise" }
         val sections = ordered.map { group ->
-            val (kept, dropped) = catalog.getValue(group).partition { it.id !in struck }
-            val pool = (kept + dropped).rotated(variationOf(group, variations) * 2)
-            val picked = pool.filter { used.add(it.name) }.take(countFor(group, ordered))
-            WorkoutSection(group, picked)
+            val pool = available(group, struck).rotated(variationOf(group, variations) * 2)
+            WorkoutSection(group, pool.take(countFor(group, ordered)))
         }
         return Workout(serial, ordered, variationOf(ordered.first(), variations), sections)
     }
+
+    fun exhausted(groups: List<MuscleGroup>, struck: Set<String>): List<MuscleGroup> =
+        groups.filter { available(it, struck).isEmpty() }
+
+    private fun available(group: MuscleGroup, struck: Set<String>) =
+        catalog.getValue(group).filter { it.id !in struck }
 
     private fun variationOf(group: MuscleGroup, variations: Map<MuscleGroup, Int>) =
         (variations[group] ?: 0).mod(VARIATIONS)

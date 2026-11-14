@@ -6,6 +6,7 @@ import com.vedovatto.setslip.domain.Language
 import com.vedovatto.setslip.domain.Level
 import com.vedovatto.setslip.domain.MuscleGroup
 import com.vedovatto.setslip.domain.Workout
+import com.vedovatto.setslip.ui.printer.PrinterPhase
 
 class Strings(
     val language: Language,
@@ -14,12 +15,14 @@ class Strings(
     private val equipmentNames: Map<Equipment, String>,
     private val levelNames: Map<Level, String>,
     private val muscleNames: Map<String, String>,
+    private val phaseNames: Map<PrinterPhase, String>,
     val print: String,
     val another: String,
-    val random: String,
     val slip: String,
+    private val exerciseWord: String,
     private val exercisesWord: String,
     private val doneFormat: String,
+    private val allCrossedOut: String,
     val cardio: String,
     val howTo: String,
     val share: String,
@@ -29,6 +32,8 @@ class Strings(
     val tips: List<Pair<String, String>>,
     val gotIt: String,
     val undo: String,
+    val check: String,
+    val crossOut: String,
     val crossedOut: String,
     val favorites: String,
     val settings: String,
@@ -43,9 +48,14 @@ class Strings(
     val vibration: String,
     val on: String,
     val off: String,
+    val vibrationOn: String,
+    val vibrationOff: String,
     val crossedOutTitle: String,
     val crossedOutEmpty: String,
     val crossedOutHint: String,
+    val reactivate: String,
+    val reactivateAll: String,
+    val noExercises: String,
     val about: String,
     val aboutText: String,
     val credits: String,
@@ -53,8 +63,8 @@ class Strings(
     val emptyFavorites: String,
     val emptyFilter: String,
     val filterHint: String,
-    val addFavorite: String,
-    val removeFavorite: String,
+    val favoriteSlip: String,
+    val maxGroups: String,
     val mute: String,
     val unmute: String,
     val indexHint: String,
@@ -64,9 +74,11 @@ class Strings(
     fun equipment(e: Equipment) = equipmentNames.getValue(e)
     fun level(l: Level) = levelNames.getValue(l)
     fun muscle(m: String) = muscleNames[m] ?: m
+    fun phase(p: PrinterPhase) = phaseNames.getValue(p)
     fun title(w: Workout) = w.groups.joinToString(" + ") { group(it).uppercase() }
-    fun exercises(n: Int) = "$n $exercisesWord"
-    fun done(done: Int, total: Int) = doneFormat.format(done, total)
+    fun exercises(n: Int) = "$n ${if (n == 1) exerciseWord else exercisesWord}"
+    fun done(done: Int, total: Int) = if (total == 0) allCrossedOut else doneFormat.format(done, total)
+    fun noExercises(groups: List<MuscleGroup>) = "$noExercises: " + groups.joinToString(", ") { group(it).uppercase() }
 }
 
 private val ptGroups = mapOf(
@@ -81,6 +93,12 @@ private val enGroups = mapOf(
     MuscleGroup.HAMSTRINGS to "Hamstrings", MuscleGroup.GLUTES to "Glutes", MuscleGroup.ABS to "Abs",
 )
 
+private val ptCodes = mapOf(
+    MuscleGroup.CHEST to "PEI", MuscleGroup.BACK to "COS", MuscleGroup.SHOULDERS to "OMB",
+    MuscleGroup.BICEPS to "BIC", MuscleGroup.TRICEPS to "TRI", MuscleGroup.QUADRICEPS to "QUA",
+    MuscleGroup.HAMSTRINGS to "POS", MuscleGroup.GLUTES to "GLU", MuscleGroup.ABS to "ABD",
+)
+
 private val enCodes = mapOf(
     MuscleGroup.CHEST to "CHE", MuscleGroup.BACK to "BAC", MuscleGroup.SHOULDERS to "SHO",
     MuscleGroup.BICEPS to "BIC", MuscleGroup.TRICEPS to "TRI", MuscleGroup.QUADRICEPS to "QUA",
@@ -90,7 +108,7 @@ private val enCodes = mapOf(
 val PtStrings = Strings(
     language = Language.PT,
     groupNames = ptGroups,
-    groupCodes = MuscleGroup.entries.associateWith { it.code },
+    groupCodes = ptCodes,
     equipmentNames = mapOf(
         Equipment.BARBELL to "Barra", Equipment.DUMBBELL to "Halteres", Equipment.CABLE to "Polia",
         Equipment.MACHINE to "Máquina", Equipment.BODY to "Peso do corpo", Equipment.EZ_BAR to "Barra W",
@@ -104,12 +122,17 @@ val PtStrings = Strings(
         "abdominals" to "abdômen", "calves" to "panturrilhas", "lower back" to "lombar", "traps" to "trapézio",
         "adductors" to "adutores", "abductors" to "abdutores", "neck" to "pescoço",
     ),
+    phaseNames = mapOf(
+        PrinterPhase.IDLE to "em repouso", PrinterPhase.PRINTING to "imprimindo",
+        PrinterPhase.READY to "ficha pronta", PrinterPhase.REPLACING to "trocando a ficha",
+    ),
     print = "IMPRIMIR",
     another = "OUTRA",
-    random = "ALEATÓRIO",
     slip = "FICHA",
+    exerciseWord = "EXERCÍCIO",
     exercisesWord = "EXERCÍCIOS",
     doneFormat = "%d DE %d FEITOS",
+    allCrossedOut = "TUDO RISCADO",
     cardio = "+ CÁRDIO À ESCOLHA (OPCIONAL)",
     howTo = "COMO FAZER",
     share = "compartilhar ficha",
@@ -124,6 +147,8 @@ val PtStrings = Strings(
     ),
     gotIt = "ENTENDI",
     undo = "DESFAZER",
+    check = "marcar feito",
+    crossOut = "riscar",
     crossedOut = "RISCADO",
     favorites = "FAVORITAS",
     settings = "AJUSTES",
@@ -138,9 +163,14 @@ val PtStrings = Strings(
     vibration = "VIBRAÇÃO",
     on = "LIGADO",
     off = "DESLIGADO",
+    vibrationOn = "LIGADA",
+    vibrationOff = "DESLIGADA",
     crossedOutTitle = "EXERCÍCIOS RISCADOS",
     crossedOutEmpty = "Nenhum exercício riscado.",
     crossedOutHint = "toque para desfazer",
+    reactivate = "REATIVAR",
+    reactivateAll = "REATIVAR TODOS",
+    noExercises = "SEM EXERCÍCIOS",
     about = "SOBRE",
     aboutText = "Setslip imprime fichas de treino. Escolha até 3 grupos e aperte imprimir.",
     credits = "CRÉDITOS",
@@ -148,8 +178,8 @@ val PtStrings = Strings(
     emptyFavorites = "Nenhuma ficha favorita ainda. Toque na estrela de uma ficha.",
     emptyFilter = "Nenhuma favorita com esses grupos.",
     filterHint = "FILTRAR POR GRUPO",
-    addFavorite = "favoritar ficha",
-    removeFavorite = "remover dos favoritos",
+    favoriteSlip = "ficha favorita",
+    maxGroups = "máximo de 3 grupos",
     mute = "silenciar",
     unmute = "ligar som",
     indexHint = "toque num exercício",
@@ -166,12 +196,17 @@ val EnStrings = Strings(
     ),
     levelNames = mapOf(Level.BEGINNER to "Beginner", Level.INTERMEDIATE to "Intermediate", Level.EXPERT to "Expert"),
     muscleNames = emptyMap(),
+    phaseNames = mapOf(
+        PrinterPhase.IDLE to "idle", PrinterPhase.PRINTING to "printing",
+        PrinterPhase.READY to "slip ready", PrinterPhase.REPLACING to "replacing slip",
+    ),
     print = "PRINT",
     another = "ANOTHER",
-    random = "RANDOM",
     slip = "SLIP",
+    exerciseWord = "EXERCISE",
     exercisesWord = "EXERCISES",
     doneFormat = "%d OF %d DONE",
+    allCrossedOut = "ALL CROSSED OUT",
     cardio = "+ CARDIO OF YOUR CHOICE (OPTIONAL)",
     howTo = "HOW TO",
     share = "share slip",
@@ -186,6 +221,8 @@ val EnStrings = Strings(
     ),
     gotIt = "GOT IT",
     undo = "UNDO",
+    check = "check off",
+    crossOut = "cross out",
     crossedOut = "CROSSED OUT",
     favorites = "FAVORITES",
     settings = "SETTINGS",
@@ -200,9 +237,14 @@ val EnStrings = Strings(
     vibration = "VIBRATION",
     on = "ON",
     off = "OFF",
+    vibrationOn = "ON",
+    vibrationOff = "OFF",
     crossedOutTitle = "CROSSED-OUT EXERCISES",
     crossedOutEmpty = "No crossed-out exercises.",
     crossedOutHint = "tap to undo",
+    reactivate = "REACTIVATE",
+    reactivateAll = "REACTIVATE ALL",
+    noExercises = "NO EXERCISES LEFT",
     about = "ABOUT",
     aboutText = "Setslip prints workout slips. Pick up to 3 muscle groups and hit print.",
     credits = "CREDITS",
@@ -210,8 +252,8 @@ val EnStrings = Strings(
     emptyFavorites = "No favorite slips yet. Tap the star on a slip.",
     emptyFilter = "No favorites with those groups.",
     filterHint = "FILTER BY GROUP",
-    addFavorite = "favorite slip",
-    removeFavorite = "remove from favorites",
+    favoriteSlip = "favorite slip",
+    maxGroups = "up to 3 groups",
     mute = "mute",
     unmute = "unmute",
     indexHint = "tap an exercise",

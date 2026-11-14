@@ -1,0 +1,79 @@
+name: e2e
+
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: Cucumber tag expression
+        required: true
+        default: "not @wip"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CUCUMBER_TAGS: ${{ inputs.tags }}
+      APK: ${{ github.workspace }}/app/build/outputs/apk/debug/app-debug.apk
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Build the debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Install Appium
+        run: |
+          npm install --global appium@3.9.0
+          appium driver install uiautomator2@8.7.3
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the suite on an emulator
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          profile: pixel_7
+          disable-animations: false
+          script: |
+            appium --address 127.0.0.1 --port 4723 --log appium.log > /dev/null 2>&1 &
+            timeout 60 sh -c 'until curl -sf http://127.0.0.1:4723/status > /dev/null; do sleep 1; done'
+            mvn -B -f e2e-appium/pom.xml test -Dapp.path="$APK" -Dwait.seconds=30 -Dcucumber.filter.tags="$CUCUMBER_TAGS" || { adb logcat -d > logcat.txt; exit 1; }
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-reports
+          path: |
+            e2e-appium/target/cucumber-reports
+            e2e-appium/target/surefire-reports
+            appium.log
+            logcat.txt
+          retention-days: 14

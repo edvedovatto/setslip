@@ -6,7 +6,6 @@ import com.vedovatto.setslip.data.Catalog
 import com.vedovatto.setslip.data.Prefs
 import com.vedovatto.setslip.data.SettingsStore
 import com.vedovatto.setslip.domain.Language
-import com.vedovatto.setslip.domain.MAX_GROUPS
 import com.vedovatto.setslip.domain.MuscleGroup
 import com.vedovatto.setslip.domain.ToggleResult
 import com.vedovatto.setslip.domain.Workout
@@ -18,12 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class PrinterPhase(val description: String) {
-    IDLE("repouso"),
-    PRINTING("imprimindo"),
-    READY("pronta"),
-    REPLACING("substituindo"),
-}
+enum class PrinterPhase { IDLE, PRINTING, READY, REPLACING }
 
 sealed interface Screen {
     data object Printer : Screen
@@ -44,17 +38,17 @@ data class PrinterUiState(
     val checked: Set<String> = emptySet(),
     val undoId: String? = null,
     val undoCount: Int = 0,
+    val blocked: List<MuscleGroup> = emptyList(),
+    val blockedCount: Int = 0,
     val screen: Screen = Screen.Printer,
     val favoriteFilter: Set<MuscleGroup> = emptySet(),
 ) {
     val soundOn: Boolean get() = prefs.soundOn
     val language: Language get() = prefs.language
     val busy: Boolean get() = phase == PrinterPhase.PRINTING || phase == PrinterPhase.REPLACING
-    val canPrint: Boolean get() = !busy && selection.isNotEmpty() && selection != current?.groups
+    val canPrint: Boolean get() = !busy && selection.isNotEmpty() && selection.toSet() != current?.groups?.toSet()
     val canReprint: Boolean get() = !busy && current != null
     val isFavorite: Boolean get() = current?.key in prefs.favorites
-    val activeExercises get() = current?.exercises.orEmpty().filter { it.id !in prefs.struck }
-    val doneCount: Int get() = activeExercises.count { it.id in checked }
 }
 
 class PrinterViewModel(
@@ -74,16 +68,9 @@ class PrinterViewModel(
     fun onKey(group: MuscleGroup) = _state.update { s ->
         if (s.busy) return@update s
         when (val r = s.selection.toggle(group)) {
-            is ToggleResult.Changed -> s.copy(selection = r.selection)
+            is ToggleResult.Changed -> s.copy(selection = r.selection, rejected = null, blocked = emptyList())
             ToggleResult.Rejected -> s.copy(rejected = group, rejectCount = s.rejectCount + 1)
         }
-    }
-
-    fun onRandom() = _state.update { s ->
-        if (s.busy) return@update s
-        val free = MuscleGroup.entries - s.selection.toSet()
-        if (s.selection.size >= MAX_GROUPS || free.isEmpty()) return@update s
-        s.copy(selection = (s.selection + free.random()).sortedBy { it.ordinal })
     }
 
     fun onPrint() {
@@ -110,7 +97,9 @@ class PrinterViewModel(
     fun onStrike(id: String) {
         val s = _state.value
         if (s.phase != PrinterPhase.READY || id in s.prefs.struck) return
-        _state.update { it.copy(checked = it.checked - id, undoId = id, undoCount = it.undoCount + 1) }
+        _state.update {
+            it.copy(checked = it.checked - id, undoId = id, undoCount = it.undoCount + 1, blocked = emptyList())
+        }
         persist { it.copy(struck = it.struck + id) }
     }
 
@@ -123,6 +112,16 @@ class PrinterViewModel(
     fun onDismissUndo() = _state.update { it.copy(undoId = null) }
 
     fun onUnstrike(id: String) = persist { it.copy(struck = it.struck - id) }
+
+    fun onUnstrikeAll() = persist { it.copy(struck = emptySet()) }
+
+    fun onReactivateBlocked() {
+        val ids = _state.value.blocked.flatMap { Catalog.exercises.getValue(it) }.map { it.id }.toSet()
+        _state.update { it.copy(blocked = emptyList()) }
+        persist { it.copy(struck = it.struck - ids) }
+    }
+
+    fun onDismissBlocked() = _state.update { it.copy(blocked = emptyList()) }
 
     fun onToggleFavorite() {
         val key = _state.value.current?.key ?: return
@@ -144,8 +143,10 @@ class PrinterViewModel(
             selection = workout.groups,
             current = workout,
             discarding = null,
+            rejected = null,
             checked = emptySet(),
             undoId = null,
+            blocked = emptyList(),
             screen = Screen.Printer,
         )
     }
@@ -169,6 +170,11 @@ class PrinterViewModel(
     }
 
     private fun emit(s: PrinterUiState, groups: List<MuscleGroup>) {
+        val exhausted = generator.exhausted(groups, s.prefs.struck)
+        if (exhausted.isNotEmpty()) {
+            _state.value = s.copy(blocked = exhausted, blockedCount = s.blockedCount + 1, undoId = null)
+            return
+        }
         val workout = generator.generate(++serial, groups, s.prefs.variations, s.prefs.struck)
         persist { p -> p.copy(variations = p.variations + groups.associateWith { (p.variations[it] ?: 0) + 1 }) }
         _state.value = s.copy(
@@ -176,8 +182,10 @@ class PrinterViewModel(
             selection = groups,
             current = workout,
             discarding = s.current,
+            rejected = null,
             checked = emptySet(),
             undoId = null,
+            blocked = emptyList(),
         )
     }
 }

@@ -13,7 +13,7 @@ object Palette {
     val Paper = Color(0xFFEFE8D8)
     val Paper2 = Color(0xFFE4DCC9)
     val PaperText = Color(0xFF1C1A17)
-    val PaperMuted = Color(0xFF6B665C)
+    val PaperMuted = Color(0xFF645F56)
     val PaperSoft = Color(0xFF4A463E)
 
     val PrinterTop = Color(0xFF3A3A43)

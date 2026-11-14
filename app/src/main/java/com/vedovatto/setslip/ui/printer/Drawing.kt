@@ -1,6 +1,5 @@
 package com.vedovatto.setslip.ui.printer
 
-import android.graphics.Bitmap
 import android.graphics.Paint
 import android.os.Build
 import android.provider.Settings
@@ -27,6 +26,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.set
 import java.util.Random
 
 fun Modifier.softShadow(
@@ -70,17 +71,16 @@ fun DrawScope.hairline(y: Float, color: Color, dash: Dp, gap: Dp) = drawLine(
     pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash.toPx(), gap.toPx())),
 )
 
-@Composable
-fun rememberPaperGrain(): ShaderBrush = remember {
+val PaperGrain: ShaderBrush by lazy {
     val n = 96
-    val bitmap = Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888)
+    val bitmap = createBitmap(n, n)
     val rnd = Random(7)
     for (x in 0 until n) for (y in 0 until n) {
         val f = rnd.nextFloat()
         val a = (f * f * f * 34).toInt()
         val c = if (rnd.nextBoolean()) android.graphics.Color.argb(a, 60, 48, 30)
         else android.graphics.Color.argb(a / 2, 255, 255, 255)
-        bitmap.setPixel(x, y, c)
+        bitmap[x, y] = c
     }
     ShaderBrush(ImageShader(bitmap.asImageBitmap(), TileMode.Repeated, TileMode.Repeated))
 }

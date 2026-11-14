@@ -15,8 +15,6 @@ data class Exercise(
     val steps: List<String>,
     val stepsEn: List<String>,
 ) {
-    val imageName: String get() = "ex_" + id.replace('-', '_')
-
     fun name(language: Language) = if (language == Language.EN) nameEn else name
 
     fun steps(language: Language) = if (language == Language.EN) stepsEn else steps
@@ -45,14 +43,14 @@ data class Workout(
         fun fromKey(serial: Int, key: String, lookup: (String) -> Exercise?): Workout? {
             val parts = key.split("|")
             if (parts.size != 3) return null
-            val variation = parts[0].toIntOrNull() ?: return null
+            val variation = parts[0].toIntOrNull()?.takeIf { it in 0 until VARIATIONS } ?: return null
             val groups = parts[1].split("+").map { n -> MuscleGroup.entries.firstOrNull { it.name == n } ?: return null }
+            if (groups.size > MAX_GROUPS || groups.distinct().size != groups.size) return null
             val ids = parts[2].split(";")
             if (ids.size != groups.size) return null
             val sections = groups.zip(ids).map { (g, line) ->
-                WorkoutSection(g, line.split(",").mapNotNull { lookup(it) })
+                WorkoutSection(g, line.split(",").map { lookup(it) ?: return null })
             }
-            if (sections.any { it.exercises.isEmpty() }) return null
             return Workout(serial, groups, variation, sections)
         }
     }

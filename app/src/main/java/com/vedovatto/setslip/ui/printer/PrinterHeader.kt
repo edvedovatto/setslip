@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -17,17 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.ui.semantics.contentDescription
-import com.vedovatto.setslip.ui.Strings
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.em
-import androidx.compose.ui.unit.sp
-import com.vedovatto.setslip.ui.theme.Fonts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,11 +35,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import com.vedovatto.setslip.ui.Strings
 import com.vedovatto.setslip.ui.printer.PrinterTimings.LED_BLINK_MS
 import com.vedovatto.setslip.ui.printer.PrinterTimings.SLOT_GLOW_MS
+import com.vedovatto.setslip.ui.theme.Fonts
 import com.vedovatto.setslip.ui.theme.Palette
 import kotlinx.coroutines.delay
 
@@ -92,11 +91,13 @@ fun PrinterHeader(
                         fontFamily = Fonts.Mono, fontWeight = FontWeight.Medium, fontSize = 12.sp,
                         letterSpacing = 0.2.em, color = Palette.CapText,
                     ),
+                    modifier = Modifier.semantics { heading() },
                 )
             }
             Led(
                 printing = printing,
                 soundOn = soundOn,
+                strings = strings,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 4.dp)
@@ -122,7 +123,7 @@ fun PrinterHeader(
 }
 
 @Composable
-private fun Led(printing: Boolean, soundOn: Boolean, modifier: Modifier) {
+private fun Led(printing: Boolean, soundOn: Boolean, strings: Strings, modifier: Modifier) {
     val target = when {
         printing -> 1f
         soundOn -> 0.4f
@@ -143,7 +144,10 @@ private fun Led(printing: Boolean, soundOn: Boolean, modifier: Modifier) {
     Box(
         modifier
             .testTag("led")
-            .semantics { stateDescription = if (soundOn) "som ligado" else "som desligado" }
+            .semantics {
+                contentDescription = strings.sound
+                stateDescription = if (soundOn) strings.on else strings.off
+            }
             .size(9.dp)
             .softShadow(Palette.Warm, blur = 12.dp, corner = 4.5.dp, alpha = { level * blink.value })
             .drawBehind {
