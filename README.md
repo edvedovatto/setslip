@@ -1,5 +1,8 @@
 # Setslip
 
+[![build](https://github.com/edvedovatto/setslip/actions/workflows/build.yml/badge.svg)](https://github.com/edvedovatto/setslip/actions/workflows/build.yml)
+[![e2e](https://github.com/edvedovatto/setslip/actions/workflows/e2e.yml/badge.svg)](https://github.com/edvedovatto/setslip/actions/workflows/e2e.yml)
+
 An Android app that prints gym workout slips. Pick up to three muscle groups, press print, and a thermal printer feeds out a slip with the exercises, sets and reps. Tick them off as you go, cross out the ones you skip, keep the good slips as favorites.
 
 The app is in Portuguese and English and works fully offline.
@@ -10,7 +13,7 @@ The app is in Portuguese and English and works fully offline.
 | --- | --- |
 | `app/` | The Android app (Kotlin, Jetpack Compose) with its unit tests |
 | `e2e-appium/` | End-to-end suite (Java, Appium, Cucumber) |
-| `.github/workflows/` | CI: build and unit tests on every push, end-to-end suite on demand |
+| `.github/workflows/` | CI: build and unit tests on every push, end-to-end suite every night and on demand |
 | `licenses/` | Credits for the sounds, the font and the exercise database |
 
 ## The app

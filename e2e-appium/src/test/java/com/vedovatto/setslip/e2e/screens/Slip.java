@@ -86,6 +86,11 @@ public class Slip extends Screen {
         waitingFor(exercise + " to be crossed out").until(driver -> isCrossedOut(exercise));
     }
 
+    public void crossOutAndWaitForUndoOffer(String exercise) {
+        longPress(row(exercise));
+        waitingFor("the offer to undo").until(driver -> undoOffered());
+    }
+
     public void crossOutAndUndo(String exercise) {
         longPress(row(exercise));
         undo();

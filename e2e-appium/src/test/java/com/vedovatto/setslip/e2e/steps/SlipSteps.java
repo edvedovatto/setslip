@@ -37,6 +37,11 @@ public class SlipSteps {
         memory.rememberExercise(exercise);
     }
 
+    @When("I cross out exercise {int} and am offered to undo it")
+    public void crossOutAndSeeUndoOffer(int position) {
+        slip.crossOutAndWaitForUndoOffer(slip.exerciseAt(position));
+    }
+
     @When("I cross out exercise {int} and undo it right away")
     public void crossOutAndUndo(int position) {
         slip.crossOutAndUndo(slip.exerciseAt(position));
@@ -100,11 +105,6 @@ public class SlipSteps {
     public void exerciseIsNotCrossedOut(int position) {
         String exercise = slip.exerciseAt(position);
         eventually(() -> assertThat(slip.isCrossedOut(exercise)).as("crossed out").isFalse());
-    }
-
-    @Then("I am offered to undo it")
-    public void offeredToUndo() {
-        eventually(() -> assertThat(slip.undoOffered()).as("undo notice").isTrue());
     }
 
     @Then("the exercises differ from the previous slip")

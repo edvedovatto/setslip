@@ -29,9 +29,8 @@ Feature: Track the workout on the slip
     And 1 of 6 exercises are done
 
   Scenario: Cross out an exercise I do not want
-    When I cross out exercise 2
-    Then I am offered to undo it
-    And exercise 2 is shown crossed out
+    When I cross out exercise 2 and am offered to undo it
+    Then exercise 2 is shown crossed out
     And 0 of 5 exercises are done
 
   Scenario: Undo a crossed-out exercise
