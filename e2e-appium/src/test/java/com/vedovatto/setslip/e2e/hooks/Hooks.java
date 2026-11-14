@@ -26,6 +26,7 @@ public class Hooks {
 
     @BeforeAll
     public static void openSession() {
+        Device.confirmImmersiveMode();
         Session.start();
     }
 

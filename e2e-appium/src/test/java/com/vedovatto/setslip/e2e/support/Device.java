@@ -24,6 +24,10 @@ public final class Device {
                 .flatMap(Device::parseScale);
     }
 
+    public static void confirmImmersiveMode() {
+        adbShell("settings", "put", "secure", "immersive_mode_confirmations", "confirmed");
+    }
+
     private static Optional<Float> parseScale(String value) {
         try {
             return Optional.of(Float.parseFloat(value));
