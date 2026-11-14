@@ -6,7 +6,10 @@ on:
       tags:
         description: Cucumber tag expression
         required: true
-        default: "not @wip"
+        default: "not @known-issue"
+  schedule:
+    - cron: "30 4 * * *"
+    - cron: "30 5 * * 1"
 
 permissions:
   contents: read
@@ -15,12 +18,15 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  EMULATOR_OPTIONS: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+
 jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      CUCUMBER_TAGS: ${{ inputs.tags }}
+      CUCUMBER_TAGS: ${{ inputs.tags || (github.event.schedule == '30 5 * * 1' && 'not @known-issue' || '@smoke') }}
       APK: ${{ github.workspace }}/app/build/outputs/apk/debug/app-debug.apk
     steps:
       - uses: actions/checkout@v7
@@ -53,6 +59,28 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Restore the emulator snapshot
+        id: avd-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-36-google_apis-pixel_7
+
+      - name: Create the emulator snapshot
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          profile: pixel_7
+          force-avd-creation: false
+          emulator-options: ${{ env.EMULATOR_OPTIONS }}
+          disable-animations: false
+          script: echo "Emulator snapshot ready"
+
       - name: Run the suite on an emulator
         uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
@@ -60,11 +88,15 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: pixel_7
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save ${{ env.EMULATOR_OPTIONS }}
           disable-animations: false
           script: |
+            adb logcat -G 16M
             appium --address 127.0.0.1 --port 4723 --log appium.log > /dev/null 2>&1 &
             timeout 60 sh -c 'until curl -sf http://127.0.0.1:4723/status > /dev/null; do sleep 1; done'
-            mvn -B -f e2e-appium/pom.xml test -Dapp.path="$APK" -Dwait.seconds=30 -Dcucumber.filter.tags="$CUCUMBER_TAGS" || { adb logcat -d > logcat.txt; exit 1; }
+            mvn -B -f e2e-appium/pom.xml test -Dapp.path="$APK" -Dwait.seconds=30 -Drecord.video=true -Dcucumber.filter.tags="@known-issue" -Dcucumber.plugin="pretty, html:target/known-issues/report.html, junit:target/known-issues/report.xml" && echo "::warning title=Known issue fixed::Every @known-issue scenario passes now, remove the tag" || echo "Known issues are still open, see the known-issues report"
+            mvn -B -f e2e-appium/pom.xml test -Dapp.path="$APK" -Dwait.seconds=30 -Drecord.video=true -Dcucumber.filter.tags="($CUCUMBER_TAGS) and not @known-issue" || { adb logcat -d > logcat.txt; exit 1; }
 
       - name: Upload reports
         if: always()
@@ -73,6 +105,7 @@ jobs:
           name: e2e-reports
           path: |
             e2e-appium/target/cucumber-reports
+            e2e-appium/target/known-issues
             e2e-appium/target/surefire-reports
             appium.log
             logcat.txt

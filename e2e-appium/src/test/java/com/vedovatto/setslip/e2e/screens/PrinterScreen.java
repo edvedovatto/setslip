@@ -104,8 +104,15 @@ public class PrinterScreen extends Screen {
         return description(STATUS);
     }
 
-    public void tapSoundLight() {
-        tap(SOUND_LIGHT);
+    public boolean soundOn() {
+        return isChecked(SOUND_LIGHT);
+    }
+
+    public void muteWithSoundLight() {
+        if (soundOn()) {
+            tap(SOUND_LIGHT);
+        }
+        waitingFor("the sound light to go off").until(driver -> !soundOn());
     }
 
     public boolean tipShown() {

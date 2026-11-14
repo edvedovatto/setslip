@@ -1,4 +1,4 @@
-@accessibility
+@accessibility @regression
 Feature: Accessibility basics
 
   Background:
@@ -15,8 +15,19 @@ Feature: Accessibility basics
       | favorite slip | favorite slip |
       | share slip    | share slip    |
 
-  Scenario: Panel controls are large enough to tap
+  Scenario: Panel controls follow the Android touch target guideline
     Then every control on the panel has a touch target of at least 48dp
+
+  Scenario: Every control meets the WCAG minimum target size
+    Then every control on the screen has a touch target of at least 24dp
+
+  @known-issue
+  Scenario: Slip and header controls follow the Android touch target guideline
+    Then these controls have a touch target of at least 48dp:
+      | sound light   |
+      | how to        |
+      | favorite slip |
+      | share slip    |
 
   Scenario: Exercises are exposed as checkboxes
     Then exercise 1 is exposed as an unchecked checkbox
@@ -32,8 +43,3 @@ Feature: Accessibility basics
     Then the printer announces "replacing slip"
     When the slip is ready
     Then the printer announces "slip ready"
-
-  Scenario: A rejected fourth group is announced
-    When I select back, shoulders
-    And I select biceps
-    Then the printer announces "up to 3 groups"

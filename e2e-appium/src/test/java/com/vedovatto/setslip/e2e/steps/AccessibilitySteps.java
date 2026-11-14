@@ -7,6 +7,7 @@ import com.vedovatto.setslip.e2e.screens.Controls;
 import com.vedovatto.setslip.e2e.screens.PrinterScreen;
 import com.vedovatto.setslip.e2e.screens.Slip;
 import io.cucumber.java.en.Then;
+import java.util.List;
 import java.util.Map;
 import org.assertj.core.api.SoftAssertions;
 
@@ -38,16 +39,30 @@ public class AccessibilitySteps {
 
     @Then("every control on the panel has a touch target of at least {int}dp")
     public void panelControlsAreLargeEnough(int minimum) {
+        touchTargetsAreAtLeast(controls.onThePanel(), minimum);
+    }
+
+    @Then("every control on the screen has a touch target of at least {int}dp")
+    public void screenControlsAreLargeEnough(int minimum) {
+        touchTargetsAreAtLeast(controls.onTheScreen(), minimum);
+    }
+
+    @Then("these controls have a touch target of at least {int}dp:")
+    public void listedControlsAreLargeEnough(int minimum, List<String> listed) {
+        touchTargetsAreAtLeast(listed, minimum);
+    }
+
+    private void touchTargetsAreAtLeast(List<String> listed, int minimum) {
         eventually(
                 () -> {
                     SoftAssertions soft = new SoftAssertions();
-                    for (String control : controls.onThePanel()) {
+                    for (String control : listed) {
                         Controls.Size size = controls.sizeOf(control);
                         soft.assertThat(size.widthDp())
-                                .as(control + " width")
+                                .as(control + " width in dp")
                                 .isGreaterThanOrEqualTo(minimum);
                         soft.assertThat(size.heightDp())
-                                .as(control + " height")
+                                .as(control + " height in dp")
                                 .isGreaterThanOrEqualTo(minimum);
                     }
                     soft.assertAll();

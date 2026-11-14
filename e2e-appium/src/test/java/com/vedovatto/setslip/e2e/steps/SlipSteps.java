@@ -37,14 +37,14 @@ public class SlipSteps {
         memory.rememberExercise(exercise);
     }
 
+    @When("I cross out exercise {int} and undo it right away")
+    public void crossOutAndUndo(int position) {
+        slip.crossOutAndUndo(slip.exerciseAt(position));
+    }
+
     @When("I cross out every exercise on the slip")
     public void crossOutEveryExercise() {
         slip.exercises().forEach(slip::crossOut);
-    }
-
-    @When("I undo it")
-    public void undo() {
-        slip.undo();
     }
 
     @When("I share the slip")

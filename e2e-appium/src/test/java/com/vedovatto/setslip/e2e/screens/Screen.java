@@ -150,9 +150,26 @@ public abstract class Screen {
     }
 
     protected List<String> tags(By locator) {
-        return driver().findElements(locator).stream()
-                .map(element -> element.getAttribute("resource-id"))
-                .toList();
+        return tagsOf(driver().findElements(locator));
+    }
+
+    protected List<String> tagsWithin(By container, By locator) {
+        return tagsOf(within(container, locator));
+    }
+
+    protected int countWithin(By container, By locator) {
+        return within(container, locator).size();
+    }
+
+    private List<WebElement> within(By container, By locator) {
+        return driver().findElements(container).stream()
+                .findFirst()
+                .map(element -> element.findElements(locator))
+                .orElse(List.of());
+    }
+
+    private static List<String> tagsOf(List<WebElement> elements) {
+        return elements.stream().map(element -> element.getAttribute("resource-id")).toList();
     }
 
     protected List<String> textsInside(By container) {

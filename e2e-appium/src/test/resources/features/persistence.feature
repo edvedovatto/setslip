@@ -1,4 +1,4 @@
-@persistence
+@persistence @regression
 Feature: What the app remembers after it is closed
 
   @smoke

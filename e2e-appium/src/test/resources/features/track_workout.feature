@@ -35,8 +35,7 @@ Feature: Track the workout on the slip
     And 0 of 5 exercises are done
 
   Scenario: Undo a crossed-out exercise
-    When I cross out exercise 2
-    And I undo it
+    When I cross out exercise 2 and undo it right away
     Then exercise 2 is not crossed out
     And 0 of 6 exercises are done
 
@@ -51,9 +50,10 @@ Feature: Track the workout on the slip
     Then the crossed-out exercise is not on the slip
 
   Scenario: Running out of exercises for a group
+    Given the app is in English
     When I cross out every exercise on the slip
     Then the slip has nothing left to do
-    And the slip counter reads "FICHA A · TUDO RISCADO"
+    And the slip counter reads "SLIP A · ALL CROSSED OUT"
     When I ask for another slip
     Then the slip lists 2 exercises
     When I cross out every exercise on the slip

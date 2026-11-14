@@ -21,7 +21,7 @@ Feature: Favorite slips
 
   Scenario: Print a favorite again
     Given a favorite slip for chest
-    And a printed slip for back
+    And I ask for another slip
     When I open the favorites
     And I use the favorite slip for chest
     Then the slip has the same exercises as the favorite

@@ -81,7 +81,7 @@ public class PrinterSteps {
 
     @When("I mute the printer with the sound light")
     public void muteWithSoundLight() {
-        printer.tapSoundLight();
+        printer.muteWithSoundLight();
     }
 
     @Then("the printer is empty")

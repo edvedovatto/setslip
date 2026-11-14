@@ -31,6 +31,13 @@ public class Controls extends Screen {
                 .toList();
     }
 
+    public List<String> onTheScreen() {
+        return Stream.concat(
+                        onThePanel().stream(),
+                        Stream.of("sound light", "how to", "favorite slip", "share slip"))
+                .toList();
+    }
+
     public String descriptionOf(String control) {
         return description(locate(control));
     }

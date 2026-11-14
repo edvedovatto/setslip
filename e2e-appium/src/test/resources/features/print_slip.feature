@@ -26,9 +26,10 @@ Feature: Print a workout slip
       | shoulders, biceps, abs | 9         |
 
   Scenario: A fourth group is not accepted
+    Given the app is in English
     When I select chest, back, shoulders
     And I select biceps
-    Then the printer announces "máximo de 3 grupos"
+    Then the printer announces "up to 3 groups"
     And the selected groups are chest, back, shoulders
 
   Scenario: The same groups cannot be printed twice in a row

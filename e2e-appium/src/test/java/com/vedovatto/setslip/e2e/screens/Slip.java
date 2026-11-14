@@ -8,10 +8,12 @@ import org.openqa.selenium.By;
 
 public class Slip extends Screen {
 
+    private static final String CURRENT_TAG = "paper_current";
     private static final String ROW_PREFIX = "row_";
+    private static final By CURRENT = tagged(CURRENT_TAG);
     private static final By ROWS = taggedWithPrefix(ROW_PREFIX);
     private static final By ACTIVE_ROWS = enabledWithPrefix(ROW_PREFIX);
-    private static final By COUNTER = inside("paper_current", "slip_counter");
+    private static final By COUNTER = inside(CURRENT_TAG, "slip_counter");
     private static final By HOW_TO = tagged("btn_how_to");
     private static final By FAVORITE = tagged("btn_favorite");
     private static final By SHARE = tagged("btn_share");
@@ -26,7 +28,7 @@ public class Slip extends Screen {
     public record Printed(String counter, List<String> exercises) {}
 
     private static By row(String exercise) {
-        return tagged(ROW_PREFIX + exercise);
+        return inside(CURRENT_TAG, ROW_PREFIX + exercise);
     }
 
     public Printed printed() {
@@ -34,7 +36,9 @@ public class Slip extends Screen {
     }
 
     public List<String> exercises() {
-        return tags(ROWS).stream().map(tag -> tag.substring(ROW_PREFIX.length())).toList();
+        return tagsWithin(CURRENT, ROWS).stream()
+                .map(tag -> tag.substring(ROW_PREFIX.length()))
+                .toList();
     }
 
     public String exerciseAt(int position) {
@@ -66,7 +70,7 @@ public class Slip extends Screen {
     }
 
     public boolean allCrossedOut() {
-        return isPresent(ROWS) && !isPresent(ACTIVE_ROWS);
+        return countWithin(CURRENT, ROWS) > 0 && countWithin(CURRENT, ACTIVE_ROWS) == 0;
     }
 
     public void check(String exercise) {
@@ -80,6 +84,11 @@ public class Slip extends Screen {
     public void crossOut(String exercise) {
         longPress(row(exercise));
         waitingFor(exercise + " to be crossed out").until(driver -> isCrossedOut(exercise));
+    }
+
+    public void crossOutAndUndo(String exercise) {
+        longPress(row(exercise));
+        undo();
     }
 
     public boolean isChecked(String exercise) {

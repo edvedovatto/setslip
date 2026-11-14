@@ -41,6 +41,10 @@ public final class TestConfig {
         }
     }
 
+    public static boolean recordVideo() {
+        return Boolean.parseBoolean(System.getProperty("record.video", "false"));
+    }
+
     private static Optional<String> property(String name) {
         return Optional.ofNullable(System.getProperty(name)).filter(value -> !value.isBlank());
     }

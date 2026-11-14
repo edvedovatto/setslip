@@ -5,12 +5,15 @@ import java.util.List;
 
 public class ParameterTypes {
 
-    @ParameterType("[a-z]+(?:, [a-z]+)*")
+    private static final String GROUP_NAME =
+            "(?:chest|back|shoulders|biceps|triceps|quadriceps|hamstrings|glutes|abs)";
+
+    @ParameterType(GROUP_NAME + "(?:, " + GROUP_NAME + ")*")
     public List<Group> groups(String names) {
         return Group.listed(names);
     }
 
-    @ParameterType("[a-z]+")
+    @ParameterType(GROUP_NAME)
     public Group group(String name) {
         return Group.named(name);
     }

@@ -69,7 +69,7 @@ public class FavoritesSteps {
 
     @When("I filter the favorites by {group}")
     public void filterBy(Group group) {
-        favorites.toggleFilter(group);
+        favorites.filterBy(group);
     }
 
     @Then("the slip is marked as favorite")

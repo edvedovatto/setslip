@@ -29,7 +29,7 @@ The debug APK ends up in `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## End-to-end tests
 
-51 scenarios written in Gherkin, covering printing, tracking the workout, favorites, the how-to screens, settings, what survives a restart, and some accessibility basics (content descriptions, touch target sizes, checkbox semantics, screen reader announcements).
+52 scenarios written in Gherkin, covering printing, tracking the workout, favorites, the how-to screens, settings, what survives a restart, and some accessibility basics (content descriptions, touch target sizes against the Android 48dp guideline and the WCAG 2.2 minimum, checkbox and switch semantics, screen reader announcements).
 
 Stack: Java 17, Maven, Appium 3 with the UiAutomator2 driver, Cucumber 8 on JUnit Platform, AssertJ and Awaitility.
 
@@ -56,11 +56,16 @@ mvn test -Ddevice.udid=emulator-5554
 | `app.path` | none | APK to install before the run |
 | `appium.url` | `http://127.0.0.1:4723` | Appium server address |
 | `wait.seconds` | `15` | how long to wait for the app before failing |
-| `cucumber.filter.tags` | all | e.g. `"@smoke"` or `"not @animations"` |
+| `record.video` | `false` | record the screen and attach the video to failed scenarios |
+| `cucumber.filter.tags` | `not @known-issue` | e.g. `"@smoke"` or `"@known-issue"` |
 
-Tags: `@smoke` for a quick pass, `@regression`, `@accessibility`, `@persistence`, and `@animations` for scenarios that depend on the print animation being on.
+Tags:
 
-Reports go to `target/cucumber-reports/` (HTML and JUnit XML). A failed scenario gets a screenshot and the page source attached.
+- `@smoke` for a quick pass, plus `@regression`, `@accessibility` and `@persistence`.
+- `@animations` marks scenarios that follow the print animation. They are skipped, with the reason in the report, when the device has animations turned off.
+- `@known-issue` marks checks that fail on purpose because the app still has the problem (some slip and header controls are below the 48dp touch target). They stay out of the normal run and CI runs them separately, so the problem shows in every report without blocking the build.
+
+Reports go to `target/cucumber-reports/` (HTML and JUnit XML). A failed scenario gets the screen, the view hierarchy, the logcat lines from that scenario and, with `record.video`, a screen recording. Assertion failures are reported as failures and environment problems as errors, so triage starts in the right place.
 
 ### How the suite is organised
 
@@ -82,12 +87,13 @@ A few choices worth knowing about:
 - **Wait for outcomes, not for states in between.** The print animation takes about four seconds. Steps wait for the slip to change and the panel to unlock, never for the short-lived "printing" state, and there is no `Thread.sleep` anywhere.
 - **Stable locators.** Compose test tags are exposed as resource ids, so the suite does not depend on texts, language or layout position. No XPath.
 - **Actions that set a state.** `favorite()`, `check()` and similar only tap when needed and then wait for the result, so they are safe to call twice.
-- **Formatting.** Spotless with google-java-format (AOSP style). `mvn spotless:apply` fixes it, CI checks it.
+- **Strict parameters.** Group names and languages are typed Cucumber parameters, so a typo in a feature file is an undefined step, not a failure halfway through a scenario.
+- **Formatting.** Spotless with google-java-format (AOSP style, pinned version). `mvn spotless:apply` fixes it, CI checks it.
 
 ## CI
 
 - `build`: runs on every push and pull request. Unit tests, lint, debug and release builds, plus a format check and compile of the end-to-end suite.
-- `e2e`: started by hand from the Actions tab. Boots an Android emulator, starts Appium, runs the suite with the tag expression you choose and uploads the reports, the Appium log and logcat.
+- `e2e`: boots an Android emulator (API 36, snapshot cached between runs), starts Appium and runs the suite with screen recording on. It runs `@smoke` every night, the full suite every Monday, and any tag expression when started by hand from the Actions tab. Known issues run in a separate pass that does not fail the job. Reports, videos, the Appium log and logcat are uploaded as artifacts.
 
 ## Credits
 

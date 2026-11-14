@@ -40,6 +40,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -147,6 +149,7 @@ private fun Led(printing: Boolean, soundOn: Boolean, strings: Strings, modifier:
             .semantics {
                 contentDescription = strings.sound
                 stateDescription = if (soundOn) strings.on else strings.off
+                toggleableState = ToggleableState(soundOn)
             }
             .size(9.dp)
             .softShadow(Palette.Warm, blur = 12.dp, corner = 4.5.dp, alpha = { level * blink.value })

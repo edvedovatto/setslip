@@ -29,4 +29,8 @@ public final class App {
     public static boolean inForeground() {
         return TestConfig.APP_PACKAGE.equals(Session.driver().getCurrentPackage());
     }
+
+    public static String foregroundActivity() {
+        return Session.driver().currentActivity();
+    }
 }

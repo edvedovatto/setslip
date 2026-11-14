@@ -55,8 +55,12 @@ public class FavoritesScreen extends Screen {
         waitUntilGone(SCREEN);
     }
 
-    public void toggleFilter(Group group) {
-        tap(tagged("filter_" + group.id()));
+    public void filterBy(Group group) {
+        By filter = tagged("filter_" + group.id());
+        if (!isChecked(filter)) {
+            tap(filter);
+        }
+        waitingFor("the " + group.id() + " filter to be on").until(driver -> isChecked(filter));
     }
 
     private Optional<String> tagOfSlipFor(Collection<Group> groups) {

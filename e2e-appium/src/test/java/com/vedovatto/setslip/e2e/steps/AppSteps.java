@@ -29,6 +29,10 @@ public class AppSteps {
 
     @Then("the system share sheet opens")
     public void shareSheetOpens() {
-        eventually(() -> assertThat(App.inForeground()).as("app in the foreground").isFalse());
+        eventually(
+                () ->
+                        assertThat(App.foregroundActivity())
+                                .as("activity in the foreground")
+                                .contains("ChooserActivity"));
     }
 }
