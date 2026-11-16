@@ -101,3 +101,7 @@ A few choices worth knowing about:
 ## Credits
 
 Exercise photos and metadata come from [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain); the how-to instructions are written for the app. Sounds are CC0 recordings from Freesound and the slip font is DM Mono (SIL Open Font License). Details in `licenses/`.
+
+## License
+
+The code is released under the MIT License, see `LICENSE`. Third-party assets keep their own licenses, listed above.
