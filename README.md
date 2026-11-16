@@ -7,6 +7,15 @@ An Android app that prints gym workout slips. Pick up to three muscle groups, pr
 
 The app is in Portuguese and English and works fully offline.
 
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/slip.png" width="200" alt="A printed workout slip for back and triceps"><br><sub>A fresh slip</sub></td>
+    <td align="center"><img src="docs/screenshots/checked.png" width="200" alt="The slip with two exercises checked off"><br><sub>Checking exercises off</sub></td>
+    <td align="center"><img src="docs/screenshots/how-to.png" width="200" alt="The how-to list for the slip"><br><sub>How to do each one</sub></td>
+    <td align="center"><img src="docs/screenshots/favorites.png" width="200" alt="The favorites screen with a saved slip"><br><sub>Favorites</sub></td>
+  </tr>
+</table>
+
 ## What is in here
 
 | Folder | What it is |
