@@ -105,7 +105,7 @@ A few choices worth knowing about:
 ## CI
 
 - `build`: runs on every push and pull request. Unit tests, lint, debug and release builds, plus a format check and compile of the end-to-end suite.
-- `e2e`: boots an Android emulator (API 36, snapshot cached between runs), starts Appium and runs the suite with screen recording on. It runs `@smoke` every night, the full suite every Monday, and any tag expression when started by hand from the Actions tab. Known issues run in a separate pass that does not fail the job. Reports, videos, the Appium log and logcat are uploaded as artifacts.
+- `e2e`: boots an Android emulator (API 36, snapshot cached between runs), starts Appium and runs the suite with screen recording on. It runs `@smoke` every night, the full suite every Monday, and any tag expression when started by hand from the Actions tab. Known issues run in a separate pass that does not fail the job; a warning shows when one of them starts passing (the bug was fixed) or fails for a reason other than an assertion. Reports, videos, the Appium log and logcat are uploaded as artifacts.
 
 ## Credits
 

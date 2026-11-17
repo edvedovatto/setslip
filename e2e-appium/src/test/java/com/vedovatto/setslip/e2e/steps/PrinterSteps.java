@@ -19,6 +19,7 @@ import java.util.List;
 public class PrinterSteps {
 
     private static final Duration TIP_WATCH = Duration.ofSeconds(2);
+    private static final Duration STAYS_LOCKED = Duration.ofSeconds(2);
 
     private final PrinterScreen printer;
     private final Slip slip;
@@ -96,12 +97,14 @@ public class PrinterSteps {
 
     @Then("I cannot print")
     public void cannotPrint() {
-        eventually(() -> assertThat(printer.canPrint()).as("print enabled").isFalse());
+        staysTrue(STAYS_LOCKED, () -> assertThat(printer.canPrint()).as("print enabled").isFalse());
     }
 
     @Then("I cannot ask for another slip")
     public void cannotAskForAnother() {
-        eventually(() -> assertThat(printer.canPrintAnother()).as("another enabled").isFalse());
+        staysTrue(
+                STAYS_LOCKED,
+                () -> assertThat(printer.canPrintAnother()).as("another enabled").isFalse());
     }
 
     @Then("the selected groups are {groups}")
