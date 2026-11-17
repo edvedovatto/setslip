@@ -29,19 +29,19 @@ jobs:
       CUCUMBER_TAGS: ${{ inputs.tags || (github.event.schedule == '30 5 * * 1' && 'not @known-issue' || '@smoke') }}
       APK: ${{ github.workspace }}/app/build/outputs/apk/debug/app-debug.apk
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-java@v6
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: 21
           cache: maven
 
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
 
@@ -61,7 +61,7 @@ jobs:
 
       - name: Restore the emulator snapshot
         id: avd-cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.android/avd/*
@@ -70,7 +70,7 @@ jobs:
 
       - name: Create the emulator snapshot
         if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@v2.38.0
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 36
           arch: x86_64
@@ -82,7 +82,7 @@ jobs:
           script: echo "Emulator snapshot ready"
 
       - name: Run the suite on an emulator
-        uses: reactivecircus/android-emulator-runner@v2.38.0
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 36
           arch: x86_64
@@ -95,12 +95,45 @@ jobs:
             adb logcat -G 16M
             appium --address 127.0.0.1 --port 4723 --log appium.log > /dev/null 2>&1 &
             timeout 60 sh -c 'until curl -sf http://127.0.0.1:4723/status > /dev/null; do sleep 1; done'
-            mvn -B -f e2e-appium/pom.xml test -Dapp.path="$APK" -Dwait.seconds=30 -Drecord.video=true -Dcucumber.filter.tags="@known-issue" -Dcucumber.plugin="pretty, html:target/known-issues/report.html, junit:target/known-issues/report.xml" && echo "::warning title=Known issue fixed::Every @known-issue scenario passes now, remove the tag" || echo "Known issues are still open, see the known-issues report"
+            mvn -B -f e2e-appium/pom.xml test -Dapp.path="$APK" -Dwait.seconds=30 -Drecord.video=true -Dcucumber.filter.tags="@known-issue" -Dcucumber.plugin="pretty, html:target/known-issues/report.html, junit:target/known-issues/report.xml" || true
             mvn -B -f e2e-appium/pom.xml test -Dapp.path="$APK" -Dwait.seconds=30 -Drecord.video=true -Dcucumber.filter.tags="($CUCUMBER_TAGS) and not @known-issue" || { adb logcat -d > logcat.txt; exit 1; }
+
+      - name: Check the known issues
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import os
+          import xml.etree.ElementTree as ET
+
+          report = "e2e-appium/target/known-issues/report.xml"
+          if not os.path.exists(report):
+              print("::warning title=Known issues::The known-issue pass did not produce a report")
+              raise SystemExit
+          fixed, broken, still_open = [], [], 0
+          for case in ET.parse(report).getroot().iter("testcase"):
+              problem = case.find("failure")
+              if problem is None:
+                  problem = case.find("error")
+              if problem is None:
+                  if case.find("skipped") is None:
+                      fixed.append(case.get("name"))
+                  continue
+              details = (problem.get("type") or "") + (problem.get("message") or "") + (problem.text or "")
+              if "AssertionError" in details or "AssertionFailedError" in details:
+                  still_open += 1
+              else:
+                  broken.append(case.get("name"))
+          for name in fixed:
+              print(f"::warning title=Known issue fixed::{name} passes now, remove the @known-issue tag")
+          for name in broken:
+              print(f"::warning title=Known issue errored::{name} failed for another reason, check the Appium log")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(f"### Known issues\n{still_open} still open, {len(fixed)} fixed, {len(broken)} errored\n")
+          EOF
 
       - name: Upload reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-reports
           path: |
