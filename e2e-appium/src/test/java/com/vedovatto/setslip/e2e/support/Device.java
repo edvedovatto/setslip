@@ -24,6 +24,10 @@ public final class Device {
                 .flatMap(Device::parseScale);
     }
 
+    public static void setAnimatorScale(float scale) {
+        putSetting("global", "animator_duration_scale", Float.toString(scale));
+    }
+
     public static void confirmImmersiveMode() {
         putSetting("secure", "immersive_mode_confirmations", "confirmed");
     }

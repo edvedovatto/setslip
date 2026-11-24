@@ -20,9 +20,13 @@ public class Hooks {
 
     private static final int MAX_FAILED_STARTS = 2;
 
+    private static final float SLOW_PRINT_SCALE = 3f;
+
     private static int failedStarts;
 
     private final PrinterScreen printer;
+
+    private Float previousScale;
 
     public Hooks(PrinterScreen printer) {
         this.printer = printer;
@@ -45,6 +49,19 @@ public class Hooks {
         if (Device.animatorScale().filter(scale -> scale == 0f).isPresent()) {
             throw new TestAbortedException(
                     "Animations are turned off on the device and this scenario follows the print animation");
+        }
+    }
+
+    @Before(value = "@slow-print", order = 2)
+    public void slowDownAnimations() {
+        previousScale = Device.animatorScale().orElse(1f);
+        Device.setAnimatorScale(SLOW_PRINT_SCALE);
+    }
+
+    @After(value = "@slow-print", order = 20000)
+    public void restoreAnimations() {
+        if (previousScale != null) {
+            Device.setAnimatorScale(previousScale);
         }
     }
 

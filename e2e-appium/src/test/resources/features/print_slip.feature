@@ -56,7 +56,7 @@ Feature: Print a workout slip
     When I ask for another slip
     Then the slip is variation A
 
-  @animations
+  @animations @slow-print
   Scenario: The panel is locked while the slip prints
     When I select chest
     And I press print
