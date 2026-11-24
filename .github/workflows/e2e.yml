@@ -93,6 +93,8 @@ jobs:
           disable-animations: false
           script: |
             adb logcat -G 16M
+            adb shell settings put global hide_error_dialogs 1
+            timeout 120 sh -c 'until [ "$(adb shell cat /proc/loadavg | cut -d. -f1)" -lt 2 ]; do sleep 5; done' || true
             appium --address 127.0.0.1 --port 4723 --log appium.log > /dev/null 2>&1 &
             timeout 60 sh -c 'until curl -sf http://127.0.0.1:4723/status > /dev/null; do sleep 1; done'
             mvn -B -f e2e-appium/pom.xml test -Dapp.path="$APK" -Dwait.seconds=30 -Drecord.video=true -Dcucumber.filter.tags="@known-issue" -Dcucumber.plugin="pretty, html:target/known-issues/report.html, junit:target/known-issues/report.xml" || true

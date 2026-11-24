@@ -25,7 +25,17 @@ public final class Device {
     }
 
     public static void confirmImmersiveMode() {
-        adbShell("settings", "put", "secure", "immersive_mode_confirmations", "confirmed");
+        putSetting("secure", "immersive_mode_confirmations", "confirmed");
+    }
+
+    public static void hideErrorDialogs() {
+        putSetting("global", "hide_error_dialogs", "1");
+    }
+
+    private static void putSetting(String namespace, String key, String value) {
+        if (adbShell("settings", "put", namespace, key, value).isEmpty()) {
+            System.err.println("Could not set " + namespace + " " + key + " on the device");
+        }
     }
 
     private static Optional<Float> parseScale(String value) {

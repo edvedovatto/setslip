@@ -18,6 +18,10 @@ import org.opentest4j.TestAbortedException;
 
 public class Hooks {
 
+    private static final int MAX_FAILED_STARTS = 2;
+
+    private static int failedStarts;
+
     private final PrinterScreen printer;
 
     public Hooks(PrinterScreen printer) {
@@ -27,6 +31,7 @@ public class Hooks {
     @BeforeAll
     public static void openSession() {
         Device.confirmImmersiveMode();
+        Device.hideErrorDialogs();
         Session.start();
     }
 
@@ -45,9 +50,19 @@ public class Hooks {
 
     @Before
     public void startWithCleanApp() {
+        if (failedStarts >= MAX_FAILED_STARTS) {
+            throw new IllegalStateException(
+                    "The app did not open in the last " + failedStarts + " scenarios, giving up");
+        }
         Evidence.startScenario();
-        App.startClean();
-        printer.waitUntilOpen();
+        try {
+            App.startClean();
+            printer.waitUntilOpen();
+            failedStarts = 0;
+        } catch (RuntimeException e) {
+            failedStarts++;
+            throw e;
+        }
     }
 
     @After
